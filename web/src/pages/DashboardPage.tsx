@@ -38,7 +38,7 @@ export default function DashboardPage() {
       </Row>
 
       <Card style={{ marginTop: 16 }} title="快捷操作">
-        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/surveys/new')} style={{ marginRight: 8 }}>
+        <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/surveys/new/edit')} style={{ marginRight: 8 }}>
           新建问卷
         </Button>
         <Button icon={<TeamOutlined />} onClick={() => navigate('/contacts')} style={{ marginRight: 8 }}>
@@ -52,7 +52,7 @@ export default function DashboardPage() {
       <Card style={{ marginTop: 16 }} title="最近问卷">
         {items.length === 0 ? (
           <Empty description="暂无问卷">
-            <Button type="primary" onClick={() => navigate('/surveys/new')}>创建第一份问卷</Button>
+            <Button type="primary" onClick={() => navigate('/surveys/new/edit')}>创建第一份问卷</Button>
           </Empty>
         ) : (
           <List

@@ -28,6 +28,7 @@ function App() {
               <Route element={<AdminLayout />}>
                 <Route path="/dashboard" element={<DashboardPage />} />
                 <Route path="/surveys" element={<SurveysPage />} />
+                <Route path="/surveys/new" element={<Navigate to="/surveys/new/edit" replace />} />
                 <Route path="/surveys/new/edit" element={<SurveyEditPage />} />
                 <Route path="/surveys/:id/edit" element={<SurveyEditPage />} />
                 <Route path="/surveys/:id" element={<SurveyDetailPage />} />
