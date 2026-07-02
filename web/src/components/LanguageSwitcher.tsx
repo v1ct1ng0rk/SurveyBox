@@ -1,4 +1,4 @@
-import { Select } from 'antd'
+import { Segmented } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { LOCALE_STORAGE_KEY, type AppLocale } from '../i18n'
 
@@ -17,12 +17,11 @@ export default function LanguageSwitcher({ size = 'middle', className }: Props) 
   }
 
   return (
-    <Select<AppLocale>
-      size={size}
+    <Segmented<AppLocale>
       className={className}
+      size={size === 'small' ? 'small' : 'middle'}
       value={locale}
       onChange={changeLocale}
-      style={{ width: size === 'small' ? 108 : 120 }}
       options={[
         { value: 'zh', label: t('common.zh') },
         { value: 'en', label: t('common.en') },

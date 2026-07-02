@@ -111,8 +111,6 @@ export default {
     surveyTitlePlaceholder: '请输入问卷标题',
     surveyDesc: '说明',
     surveyDescPlaceholder: '向填写者说明问卷目的',
-    displayLocale: '显示语言',
-    displayLocaleHint: '填写页 UI 及默认感谢语使用的语言',
     successMessage: '感谢语',
     successMessagePlaceholder: '填写者提交成功后显示的文案',
     fieldStructure: '字段结构',

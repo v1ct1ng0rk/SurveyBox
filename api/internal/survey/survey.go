@@ -318,7 +318,7 @@ func (s *Service) generate(c *gin.Context) {
 		return
 	}
 	locale := strings.TrimSpace(req.Locale)
-	if sv.DisplayLocale != "" {
+	if locale == "" {
 		locale = sv.DisplayLocale
 	}
 	if locale != "en" {

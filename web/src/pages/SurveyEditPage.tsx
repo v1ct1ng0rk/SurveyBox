@@ -68,7 +68,6 @@ export default function SurveyEditPage() {
   const [fields, setFields] = useState<SurveyField[]>([])
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
-  const [displayLocale, setDisplayLocale] = useState<AppLocale>('zh')
   const [successMessage, setSuccessMessage] = useState('')
   const [html, setHtml] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
@@ -96,14 +95,14 @@ export default function SurveyEditPage() {
     [t, i18n.language],
   )
 
-  const defaultSuccessMessage = useMemo(
-    () => t('surveyDefaults.successMessage', { lng: displayLocale }),
-    [t, displayLocale],
+  const surveyLocale = useMemo(
+    () => normalizeSurveyLocale(i18n.language === 'en' ? 'en' : 'zh'),
+    [i18n.language],
   )
 
-  const generateLocale = useMemo(
-    () => normalizeSurveyLocale(displayLocale || (i18n.language === 'en' ? 'en' : 'zh')),
-    [displayLocale, i18n.language],
+  const defaultSuccessMessage = useMemo(
+    () => t('surveyDefaults.successMessage', { lng: surveyLocale }),
+    [t, surveyLocale],
   )
 
   const { data: survey, isLoading, isError } = useQuery({
@@ -117,7 +116,6 @@ export default function SurveyEditPage() {
     if (survey) {
       setTitle(survey.title)
       setDescription(survey.description)
-      setDisplayLocale(normalizeSurveyLocale(survey.display_locale))
       setSuccessMessage(survey.success_message || '')
       const schema = survey.schema || { fields: [] }
       setFields(schema.fields || [])
@@ -135,7 +133,7 @@ export default function SurveyEditPage() {
       description,
       html,
       templateLabels,
-      displayLocale,
+      surveyLocale,
       successMessage.trim() || defaultSuccessMessage,
     ),
     onSuccess: (surveyId) => {
@@ -155,7 +153,7 @@ export default function SurveyEditPage() {
       const { data } = await api.post(`/surveys/${id}/generate`, {
         prompt: llmPrompt,
         mode: 'full',
-        locale: generateLocale,
+        locale: surveyLocale,
       })
       return data
     },
@@ -184,7 +182,7 @@ export default function SurveyEditPage() {
         description,
         html,
         templateLabels,
-        displayLocale,
+        surveyLocale,
         successMessage.trim() || defaultSuccessMessage,
       )
       await api.post(`/surveys/${surveyId}/publish`)
@@ -302,16 +300,6 @@ export default function SurveyEditPage() {
               </Form.Item>
               <Form.Item label={t('surveyEdit.surveyDesc')}>
                 <TextArea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('surveyEdit.surveyDescPlaceholder')} />
-              </Form.Item>
-              <Form.Item label={t('surveyEdit.displayLocale')} extra={t('surveyEdit.displayLocaleHint')}>
-                <Select<AppLocale>
-                  value={displayLocale}
-                  onChange={setDisplayLocale}
-                  options={[
-                    { value: 'zh', label: t('common.zh') },
-                    { value: 'en', label: t('common.en') },
-                  ]}
-                />
               </Form.Item>
               <Form.Item label={t('surveyEdit.successMessage')}>
                 <TextArea

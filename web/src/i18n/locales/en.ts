@@ -111,8 +111,6 @@ export default {
     surveyTitlePlaceholder: 'Enter survey title',
     surveyDesc: 'Description',
     surveyDescPlaceholder: 'Explain the purpose to respondents',
-    displayLocale: 'Display language',
-    displayLocaleHint: 'Language used on the public fill page and default thank-you message',
     successMessage: 'Thank-you message',
     successMessagePlaceholder: 'Shown to respondents after they submit',
     fieldStructure: 'Field structure',

@@ -52,41 +52,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-.admin-language-switcher.ant-select,
-.ant-pro-global-header .admin-language-switcher.ant-select {
-  min-width: 108px;
+.admin-language-switcher.ant-segmented {
+  background: #f0f2f5;
 }
 
-.admin-language-switcher.ant-select .ant-select-selector,
-.ant-pro-global-header .admin-language-switcher.ant-select .ant-select-selector {
-  height: 32px !important;
-  padding-inline: 11px !important;
-  display: flex !important;
-  align-items: center !important;
-}
-
-.admin-language-switcher.ant-select .ant-select-selection-item,
-.ant-pro-global-header .admin-language-switcher.ant-select .ant-select-selection-item {
-  line-height: 1.2 !important;
-  padding-inline-end: 18px !important;
-}
-
-.admin-language-switcher.ant-select .ant-select-arrow,
-.ant-pro-global-header .admin-language-switcher.ant-select .ant-select-arrow {
-  top: 50% !important;
-  inset-block-start: auto !important;
-  margin-top: 0 !important;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  height: 12px;
+.admin-language-switcher.ant-segmented .ant-segmented-item-label {
+  min-height: 22px;
+  line-height: 22px;
+  padding-inline: 10px;
 }
 
 /* Header: language switcher + username vertically centered */
 .admin-header-lang {
   display: flex;
   align-items: center;
-  height: 32px;
 }
 
 .ant-pro-global-header-right {
