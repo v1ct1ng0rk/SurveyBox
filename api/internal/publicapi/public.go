@@ -36,7 +36,7 @@ func (s *Service) RegisterRoutes(r *gin.RouterGroup) {
 	r.GET("/surveys/:token", middleware.RateLimit(60, time.Minute, func(c *gin.Context) string {
 		return "pub-get:" + c.ClientIP()
 	}), s.getSurvey)
-	r.POST("/responses", middleware.RateLimit(3, time.Minute, func(c *gin.Context) string {
+	r.POST("/responses", middleware.RateLimit(30, time.Minute, func(c *gin.Context) string {
 		return "pub-submit:" + c.GetHeader("X-Share-Token")
 	}), s.submitResponse)
 	r.POST("/files", middleware.RateLimit(10, time.Hour, func(c *gin.Context) string {
@@ -73,6 +73,22 @@ func (s *Service) getSurvey(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效或已过期"})
 		return
 	}
+
+	var surveyStatus string
+	err = s.pool.QueryRow(c, `SELECT status::text FROM surveys WHERE id=$1`, sc.SurveyID).Scan(&surveyStatus)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效或已过期"})
+		return
+	}
+	if surveyStatus == "paused" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "问卷已结束"})
+		return
+	}
+	if surveyStatus != "published" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效或已过期"})
+		return
+	}
+
 	var title, desc, successMsg string
 	var allowMultiple bool
 	var schemaRaw json.RawMessage
@@ -82,7 +98,7 @@ func (s *Service) getSurvey(c *gin.Context) {
 		       sv.schema, sv.html_template
 		FROM surveys s
 		JOIN survey_versions sv ON sv.id = s.current_version_id
-		WHERE s.id = $1 AND s.status = 'published'
+		WHERE s.id = $1
 	`, sc.SurveyID).Scan(&title, &desc, &successMsg, &allowMultiple, &schemaRaw, &html)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效或已过期"})

@@ -195,7 +195,9 @@ export default {
   fill: {
     badge: 'Online survey',
     submit: 'Submit',
+    submitting: 'Submitting…',
     submitFailed: 'Submission failed',
+    validationFailed: 'Please complete all required fields',
     uploadSuccess: 'Uploaded successfully',
     uploadText: 'Click or drag to upload',
     linkInvalid: 'Link expired',

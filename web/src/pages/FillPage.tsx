@@ -1,6 +1,7 @@
-import { useState, useMemo, type ReactNode } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
+  App,
   Button,
   Checkbox,
   Form,
@@ -9,13 +10,12 @@ import {
   Radio,
   Select,
   Upload,
-  message,
   Result,
   Spin,
   Typography,
 } from 'antd'
 import { InboxOutlined } from '@ant-design/icons'
-import axios from 'axios'
+import axios, { type AxiosError } from 'axios'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useApiError } from '../i18n/hooks'
@@ -35,12 +35,20 @@ function getErrorMessage(err: unknown) {
   return (err as { response?: { data?: { error?: string } } })?.response?.data?.error
 }
 
+function isEmptyValue(value: unknown) {
+  if (value === undefined || value === null) return true
+  if (typeof value === 'string') return value.trim() === ''
+  if (Array.isArray(value)) return value.length === 0
+  return false
+}
+
 export default function FillPage() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
   const [form] = Form.useForm()
   const { t } = useTranslation()
   const apiError = useApiError()
+  const { message } = App.useApp()
   const [fileMap, setFileMap] = useState<Record<string, { file_id: string; filename: string }>>({})
 
   const publicApi = useMemo(
@@ -52,11 +60,13 @@ export default function FillPage() {
     [token],
   )
 
-  const { data: survey, isLoading, error } = useQuery({
+  const { data: survey, isLoading, error, refetch } = useQuery({
     queryKey: ['fill', token],
     queryFn: async () => (await publicApi.get(`/surveys/${token}`)).data,
     enabled: !!token,
     retry: false,
+    staleTime: 0,
+    refetchOnMount: 'always',
   })
 
   const submitMutation = useMutation({
@@ -67,8 +77,19 @@ export default function FillPage() {
       })
       return publicApi.post('/responses', { answers: payload })
     },
-    onSuccess: () => navigate(`/f/${token}/success`),
-    onError: (err: unknown) => {
+    onSuccess: async () => {
+      message.success(t('fillSuccess.title'))
+      await refetch()
+      navigate(`/f/${token}/success`, { replace: true })
+    },
+    onError: async (err: unknown) => {
+      const axiosErr = err as AxiosError<{ error?: string }>
+      const status = axiosErr.response?.status
+      if (status === 409) {
+        message.info(t('fill.alreadySubmitted'))
+        await refetch()
+        return
+      }
       message.error(apiError(getErrorMessage(err), 'fill.submitFailed'))
     },
   })
@@ -91,6 +112,18 @@ export default function FillPage() {
 
   const fieldRules = (f: Field) => {
     if (!f.required || f.type === 'section') return []
+    if (f.type === 'checkbox') {
+      return [{
+        validator: (_: unknown, value: unknown) =>
+          !isEmptyValue(value) ? Promise.resolve() : Promise.reject(new Error(t('fill.fieldRequired', { label: f.label }))),
+      }]
+    }
+    if (f.type === 'file') {
+      return [{
+        validator: (_: unknown, value: unknown) =>
+          !isEmptyValue(value) || fileMap[f.id] ? Promise.resolve() : Promise.reject(new Error(t('fill.fieldRequired', { label: f.label }))),
+      }]
+    }
     return [{ required: true, message: t('fill.fieldRequired', { label: f.label }) }]
   }
 
@@ -102,10 +135,10 @@ export default function FillPage() {
     )
   }
 
-  if (error || !survey) {
+	if (error || !survey) {
     const errMsg = getErrorMessage(error)
     const translated = apiError(errMsg)
-    const ended = translated === t('fill.surveyEnded')
+    const ended = errMsg === '问卷已结束' || translated === t('fill.surveyEnded')
     return (
       <div className="public-card fill-page__result">
         <Result
@@ -156,7 +189,7 @@ export default function FillPage() {
           className="fill-page__upload"
           maxCount={1}
           beforeUpload={(file) => {
-            uploadFile(f.id, file)
+            void uploadFile(f.id, file)
             return false
           }}
         >
@@ -217,6 +250,7 @@ export default function FillPage() {
         form={form}
         layout="vertical"
         className="fill-page__form"
+        scrollToFirstError={{ behavior: 'smooth', block: 'center' }}
         requiredMark={(label, { required }) => (
           required ? (
             <>
@@ -226,11 +260,14 @@ export default function FillPage() {
           ) : label
         )}
         onFinish={(values) => submitMutation.mutate(values)}
+        onFinishFailed={() => {
+          message.warning(t('fill.validationFailed'))
+        }}
       >
         {fields.map(renderField)}
         <Form.Item className="fill-page__submit">
           <Button type="primary" htmlType="submit" size="large" block loading={submitMutation.isPending}>
-            {t('fill.submit')}
+            {submitMutation.isPending ? t('fill.submitting') : t('fill.submit')}
           </Button>
         </Form.Item>
       </Form>

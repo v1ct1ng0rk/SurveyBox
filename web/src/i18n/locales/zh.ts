@@ -195,7 +195,9 @@ export default {
   fill: {
     badge: '在线问卷',
     submit: '提交问卷',
+    submitting: '提交中…',
     submitFailed: '提交失败',
+    validationFailed: '请检查并填写所有必填项',
     uploadSuccess: '上传成功',
     uploadText: '点击或拖拽上传',
     linkInvalid: '链接已失效',

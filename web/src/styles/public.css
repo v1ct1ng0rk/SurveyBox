@@ -132,6 +132,15 @@
   margin-bottom: 0;
 }
 
+.fill-page__form-item.ant-form-item-has-error {
+  margin-bottom: 4px;
+}
+
+.fill-page__form .ant-form-item-explain-error {
+  margin-top: 8px;
+  font-size: 14px;
+}
+
 .fill-page__required {
   color: #ff4d4f;
   margin-left: 4px;
