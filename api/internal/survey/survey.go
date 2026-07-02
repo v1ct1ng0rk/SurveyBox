@@ -31,6 +31,7 @@ type Survey struct {
 	Description        string          `json:"description"`
 	Status             string          `json:"status"`
 	AllowMultipleSubmit bool           `json:"allow_multiple_submit"`
+	DisplayLocale      string          `json:"display_locale"`
 	SuccessMessage     string          `json:"success_message"`
 	CurrentVersionID   *string         `json:"current_version_id,omitempty"`
 	Schema             json.RawMessage `json:"schema,omitempty"`
@@ -178,6 +179,7 @@ func (s *Service) update(c *gin.Context) {
 		Schema      json.RawMessage  `json:"schema"`
 		HTMLTemplate *string         `json:"html_template"`
 		SuccessMessage *string      `json:"success_message"`
+		DisplayLocale  *string      `json:"display_locale"`
 		AllowMultipleSubmit *bool   `json:"allow_multiple_submit"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -204,6 +206,13 @@ func (s *Service) update(c *gin.Context) {
 	}
 	if req.SuccessMessage != nil {
 		_, _ = s.pool.Exec(c, `UPDATE surveys SET success_message=$1, updated_at=NOW() WHERE id=$2`, *req.SuccessMessage, id)
+	}
+	if req.DisplayLocale != nil {
+		locale := strings.TrimSpace(*req.DisplayLocale)
+		if locale != "en" {
+			locale = "zh"
+		}
+		_, _ = s.pool.Exec(c, `UPDATE surveys SET display_locale=$1, updated_at=NOW() WHERE id=$2`, locale, id)
 	}
 	if req.AllowMultipleSubmit != nil {
 		_, _ = s.pool.Exec(c, `UPDATE surveys SET allow_multiple_submit=$1, updated_at=NOW() WHERE id=$2`, *req.AllowMultipleSubmit, id)
@@ -293,6 +302,7 @@ func (s *Service) generate(c *gin.Context) {
 	var req struct {
 		Prompt string `json:"prompt" binding:"required"`
 		Mode   string `json:"mode"`
+		Locale string `json:"locale"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请输入描述"})
@@ -302,12 +312,19 @@ func (s *Service) generate(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "描述过长"})
 		return
 	}
-	_, err := s.loadSurvey(c, id, userID)
+	sv, err := s.loadSurvey(c, id, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "问卷不存在"})
 		return
 	}
-	result, err := s.llm.GenerateSurvey(c, req.Prompt, req.Mode)
+	locale := strings.TrimSpace(req.Locale)
+	if sv.DisplayLocale != "" {
+		locale = sv.DisplayLocale
+	}
+	if locale != "en" {
+		locale = "zh"
+	}
+	result, err := s.llm.GenerateSurvey(c, req.Prompt, req.Mode, locale)
 	if err != nil {
 		c.JSON(http.StatusBadGateway, gin.H{"error": err.Error()})
 		return
@@ -418,11 +435,11 @@ func (s *Service) loadSurvey(c *gin.Context, id, userID string) (*Survey, error)
 	var versionID *string
 	err := s.pool.QueryRow(c, `
 		SELECT s.id::text, s.title, s.description, s.status::text, s.allow_multiple_submit,
-		       s.success_message, s.current_version_id::text, s.created_at, s.updated_at
+		       s.display_locale, s.success_message, s.current_version_id::text, s.created_at, s.updated_at
 		FROM surveys s
 		WHERE s.id = $1 AND s.created_by = $2
 	`, id, userID).Scan(&sv.ID, &sv.Title, &sv.Description, &sv.Status, &sv.AllowMultipleSubmit,
-		&sv.SuccessMessage, &versionID, &sv.CreatedAt, &sv.UpdatedAt)
+		&sv.DisplayLocale, &sv.SuccessMessage, &versionID, &sv.CreatedAt, &sv.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}

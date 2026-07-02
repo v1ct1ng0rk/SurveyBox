@@ -110,6 +110,10 @@ export default {
     surveyTitlePlaceholder: 'Enter survey title',
     surveyDesc: 'Description',
     surveyDescPlaceholder: 'Explain the purpose to respondents',
+    displayLocale: 'Display language',
+    displayLocaleHint: 'Language used on the public fill page and default thank-you message',
+    successMessage: 'Thank-you message',
+    successMessagePlaceholder: 'Shown to respondents after they submit',
     fieldStructure: 'Field structure',
     addField: 'Add field',
     emptyFields: 'No fields yet. Click Add field above.',
@@ -213,6 +217,9 @@ export default {
     title: 'Submitted successfully',
     thanks: 'Thank you for your response',
     thanksOrg: 'Thank you for supporting {{org}}',
+  },
+  surveyDefaults: {
+    successMessage: 'Thank you for taking the time to complete this survey. Your feedback helps us improve our service.',
   },
   clipboard: {
     copied: 'Link copied',

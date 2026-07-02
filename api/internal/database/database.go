@@ -4,7 +4,9 @@ import (
 	"context"
 	"embed"
 	"fmt"
-	"os"
+	"io/fs"
+	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -27,20 +29,30 @@ func Connect(ctx context.Context, databaseURL string) (*pgxpool.Pool, error) {
 }
 
 func Migrate(ctx context.Context, pool *pgxpool.Pool) error {
-	content, err := migrationFS.ReadFile("migrations/001_init.sql")
+	entries, err := fs.ReadDir(migrationFS, "migrations")
 	if err != nil {
-		// fallback to repo root migrations when running from api/
-		content, err = os.ReadFile("../migrations/001_init.sql")
-		if err != nil {
-			return fmt.Errorf("read migration: %w", err)
-		}
+		return fmt.Errorf("list migrations: %w", err)
 	}
-	_, err = pool.Exec(ctx, string(content))
-	if err != nil {
-		if strings.Contains(err.Error(), "already exists") {
-			return nil
+	var names []string
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".sql" {
+			continue
 		}
-		return fmt.Errorf("run migration: %w", err)
+		names = append(names, entry.Name())
+	}
+	sort.Strings(names)
+
+	for _, name := range names {
+		content, err := migrationFS.ReadFile("migrations/" + name)
+		if err != nil {
+			return fmt.Errorf("read migration %s: %w", name, err)
+		}
+		if _, err := pool.Exec(ctx, string(content)); err != nil {
+			if strings.Contains(err.Error(), "already exists") {
+				continue
+			}
+			return fmt.Errorf("run migration %s: %w", name, err)
+		}
 	}
 	return nil
 }

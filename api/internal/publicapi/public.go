@@ -89,17 +89,17 @@ func (s *Service) getSurvey(c *gin.Context) {
 		return
 	}
 
-	var title, desc, successMsg string
+	var title, desc, successMsg, displayLocale string
 	var allowMultiple bool
 	var schemaRaw json.RawMessage
 	var html string
 	err = s.pool.QueryRow(c, `
-		SELECT s.title, s.description, s.success_message, s.allow_multiple_submit,
+		SELECT s.title, s.description, s.success_message, s.display_locale, s.allow_multiple_submit,
 		       sv.schema, sv.html_template
 		FROM surveys s
 		JOIN survey_versions sv ON sv.id = s.current_version_id
 		WHERE s.id = $1
-	`, sc.SurveyID).Scan(&title, &desc, &successMsg, &allowMultiple, &schemaRaw, &html)
+	`, sc.SurveyID).Scan(&title, &desc, &successMsg, &displayLocale, &allowMultiple, &schemaRaw, &html)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效或已过期"})
 		return
@@ -112,8 +112,13 @@ func (s *Service) getSurvey(c *gin.Context) {
 
 	_, _ = s.pool.Exec(c, `UPDATE shares SET status='opened' WHERE id=$1 AND status='pending'`, sc.ShareID)
 
+	if displayLocale != "en" {
+		displayLocale = "zh"
+	}
+
 	c.JSON(http.StatusOK, gin.H{
 		"title": title, "description": desc, "success_message": successMsg,
+		"display_locale": displayLocale,
 		"schema": schemaRaw, "html_template": html,
 		"allow_multiple_submit": allowMultiple,
 		"submitted": shareStatus == "submitted",

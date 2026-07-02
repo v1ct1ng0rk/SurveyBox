@@ -110,6 +110,10 @@ export default {
     surveyTitlePlaceholder: '请输入问卷标题',
     surveyDesc: '说明',
     surveyDescPlaceholder: '向填写者说明问卷目的',
+    displayLocale: '显示语言',
+    displayLocaleHint: '填写页 UI 及默认感谢语使用的语言',
+    successMessage: '感谢语',
+    successMessagePlaceholder: '填写者提交成功后显示的文案',
     fieldStructure: '字段结构',
     addField: '添加字段',
     emptyFields: '暂无字段，点击右上角添加',
@@ -213,6 +217,9 @@ export default {
     title: '提交成功',
     thanks: '感谢您的填写',
     thanksOrg: '感谢您对 {{org}} 的支持',
+  },
+  surveyDefaults: {
+    successMessage: '感谢您抽出宝贵时间参与本次调查，您的反馈将帮助我们不断提升服务质量。',
   },
   clipboard: {
     copied: '链接已复制',

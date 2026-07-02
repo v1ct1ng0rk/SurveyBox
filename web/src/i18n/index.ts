@@ -7,6 +7,10 @@ import { resolveInitialLocale } from './detectLocale'
 export const LOCALE_STORAGE_KEY = 'surveybox_locale'
 export type AppLocale = 'zh' | 'en'
 
+export function normalizeSurveyLocale(value?: string | null): AppLocale {
+  return value === 'en' ? 'en' : 'zh'
+}
+
 void i18n.use(initReactI18next).init({
   resources: {
     zh: { translation: zh },

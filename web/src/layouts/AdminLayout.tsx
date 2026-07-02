@@ -61,7 +61,7 @@ export default function AdminLayout() {
       fixSiderbar
       location={{ pathname: location.pathname }}
       route={{ routes: menuRoutes }}
-      actionsRender={() => [<LanguageSwitcher key="lang" size="small" />]}
+      actionsRender={() => [<LanguageSwitcher key="lang" size="small" className="admin-language-switcher" />]}
       menuItemRender={(item, dom) => (
         <a
           onClick={(e) => {

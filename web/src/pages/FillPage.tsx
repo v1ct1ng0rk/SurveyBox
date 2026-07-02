@@ -19,6 +19,7 @@ import axios, { type AxiosError } from 'axios'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import { useApiError } from '../i18n/hooks'
+import { useFillSurveyLocale } from '../i18n/useFillSurveyLocale'
 
 const { Title, Paragraph, Text } = Typography
 const { Dragger } = Upload
@@ -69,6 +70,8 @@ export default function FillPage() {
     refetchOnMount: 'always',
   })
 
+  useFillSurveyLocale(survey?.display_locale)
+
   const submitMutation = useMutation({
     mutationFn: async (values: Record<string, unknown>) => {
       const payload: Record<string, unknown> = { ...values }
@@ -112,19 +115,16 @@ export default function FillPage() {
 
   const fieldRules = (f: Field) => {
     if (!f.required || f.type === 'section') return []
-    if (f.type === 'checkbox') {
-      return [{
-        validator: (_: unknown, value: unknown) =>
-          !isEmptyValue(value) ? Promise.resolve() : Promise.reject(new Error(t('fill.fieldRequired', { label: f.label }))),
-      }]
-    }
-    if (f.type === 'file') {
-      return [{
-        validator: (_: unknown, value: unknown) =>
-          !isEmptyValue(value) || fileMap[f.id] ? Promise.resolve() : Promise.reject(new Error(t('fill.fieldRequired', { label: f.label }))),
-      }]
-    }
-    return [{ required: true, message: t('fill.fieldRequired', { label: f.label }) }]
+    return [{
+      validator: (_: unknown, value: unknown) => {
+        const filled = f.type === 'file'
+          ? !isEmptyValue(value) || !!fileMap[f.id]
+          : !isEmptyValue(value)
+        return filled
+          ? Promise.resolve()
+          : Promise.reject(new Error(t('fill.fieldRequired', { label: f.label })))
+      },
+    }]
   }
 
   if (isLoading) {
@@ -135,7 +135,7 @@ export default function FillPage() {
     )
   }
 
-	if (error || !survey) {
+  if (error || !survey) {
     const errMsg = getErrorMessage(error)
     const translated = apiError(errMsg)
     const ended = errMsg === '问卷已结束' || translated === t('fill.surveyEnded')

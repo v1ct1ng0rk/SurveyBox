@@ -43,3 +43,20 @@
   border-radius: 12px;
   overflow: hidden;
 }
+
+.admin-language-switcher.ant-select,
+.ant-pro-global-header .admin-language-switcher.ant-select {
+  min-width: 108px;
+}
+
+.admin-language-switcher.ant-select .ant-select-selector,
+.ant-pro-global-header .admin-language-switcher.ant-select .ant-select-selector {
+  height: 32px !important;
+  padding-inline: 11px !important;
+  align-items: center;
+}
+
+.admin-language-switcher.ant-select .ant-select-selection-item,
+.ant-pro-global-header .admin-language-switcher.ant-select .ant-select-selection-item {
+  line-height: 30px !important;
+}

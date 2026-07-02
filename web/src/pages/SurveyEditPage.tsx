@@ -10,6 +10,7 @@ import { useTranslation } from 'react-i18next'
 import api from '../lib/api'
 import { buildPreviewDocument, defaultHTML, type SurveyField, type SurveyTemplateLabels } from '../lib/surveyTemplate'
 import { useApiError, useSurveyStatus } from '../i18n/hooks'
+import { normalizeSurveyLocale, type AppLocale } from '../i18n'
 import PublishSuccessModal from '../components/PublishSuccessModal'
 
 const { TextArea } = Input
@@ -18,10 +19,20 @@ const { Text } = Typography
 const FIELD_TYPE_KEYS = ['text', 'textarea', 'number', 'select', 'radio', 'checkbox', 'file', 'section'] as const
 const PROMPT_CHIP_KEYS = ['chipSatisfaction', 'chipNps', 'chipFile', 'chipMulti'] as const
 
-function buildSurveyPayload(fields: SurveyField[], title: string, description: string, html: string, labels: SurveyTemplateLabels) {
+function buildSurveyPayload(
+  fields: SurveyField[],
+  title: string,
+  description: string,
+  html: string,
+  labels: SurveyTemplateLabels,
+  displayLocale: AppLocale,
+  successMessage: string,
+) {
   return {
     title,
     description,
+    display_locale: displayLocale,
+    success_message: successMessage,
     schema: { version: 1, fields },
     html_template: html || defaultHTML(fields, labels),
   }
@@ -34,8 +45,10 @@ async function persistSurvey(
   description: string,
   html: string,
   labels: SurveyTemplateLabels,
+  displayLocale: AppLocale,
+  successMessage: string,
 ) {
-  const payload = buildSurveyPayload(fields, title, description, html, labels)
+  const payload = buildSurveyPayload(fields, title, description, html, labels, displayLocale, successMessage)
   if (id === 'new') {
     const { data } = await api.post('/surveys')
     await api.put(`/surveys/${data.id}`, payload)
@@ -55,6 +68,8 @@ export default function SurveyEditPage() {
   const [fields, setFields] = useState<SurveyField[]>([])
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
+  const [displayLocale, setDisplayLocale] = useState<AppLocale>('zh')
+  const [successMessage, setSuccessMessage] = useState('')
   const [html, setHtml] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [llmPrompt, setLlmPrompt] = useState('')
@@ -81,6 +96,16 @@ export default function SurveyEditPage() {
     [t, i18n.language],
   )
 
+  const defaultSuccessMessage = useMemo(
+    () => t('surveyDefaults.successMessage', { lng: displayLocale }),
+    [t, displayLocale],
+  )
+
+  const generateLocale = useMemo(
+    () => normalizeSurveyLocale(displayLocale || (i18n.language === 'en' ? 'en' : 'zh')),
+    [displayLocale, i18n.language],
+  )
+
   const { data: survey, isLoading, isError } = useQuery({
     queryKey: ['survey', id],
     queryFn: async () => (await api.get(`/surveys/${id}`)).data,
@@ -92,6 +117,8 @@ export default function SurveyEditPage() {
     if (survey) {
       setTitle(survey.title)
       setDescription(survey.description)
+      setDisplayLocale(normalizeSurveyLocale(survey.display_locale))
+      setSuccessMessage(survey.success_message || '')
       const schema = survey.schema || { fields: [] }
       setFields(schema.fields || [])
       setHtml(survey.html_template || '')
@@ -101,7 +128,16 @@ export default function SurveyEditPage() {
   const syncHTML = (next: SurveyField[]) => setHtml(defaultHTML(next, templateLabels))
 
   const saveMutation = useMutation({
-    mutationFn: async () => persistSurvey(id, fields, title, description, html, templateLabels),
+    mutationFn: async () => persistSurvey(
+      id,
+      fields,
+      title,
+      description,
+      html,
+      templateLabels,
+      displayLocale,
+      successMessage.trim() || defaultSuccessMessage,
+    ),
     onSuccess: (surveyId) => {
       message.success(t('surveyEdit.saved'))
       queryClient.invalidateQueries({ queryKey: ['surveys'] })
@@ -116,7 +152,11 @@ export default function SurveyEditPage() {
 
   const generateMutation = useMutation({
     mutationFn: async () => {
-      const { data } = await api.post(`/surveys/${id}/generate`, { prompt: llmPrompt, mode: 'full' })
+      const { data } = await api.post(`/surveys/${id}/generate`, {
+        prompt: llmPrompt,
+        mode: 'full',
+        locale: generateLocale,
+      })
       return data
     },
     onSuccess: (data) => {
@@ -137,7 +177,16 @@ export default function SurveyEditPage() {
       if (fields.length === 0) {
         throw new Error(t('surveyEdit.publishNeedFields'))
       }
-      const surveyId = await persistSurvey(id, fields, title, description, html, templateLabels)
+      const surveyId = await persistSurvey(
+        id,
+        fields,
+        title,
+        description,
+        html,
+        templateLabels,
+        displayLocale,
+        successMessage.trim() || defaultSuccessMessage,
+      )
       await api.post(`/surveys/${surveyId}/publish`)
       return surveyId
     },
@@ -253,6 +302,24 @@ export default function SurveyEditPage() {
               </Form.Item>
               <Form.Item label={t('surveyEdit.surveyDesc')}>
                 <TextArea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('surveyEdit.surveyDescPlaceholder')} />
+              </Form.Item>
+              <Form.Item label={t('surveyEdit.displayLocale')} extra={t('surveyEdit.displayLocaleHint')}>
+                <Select<AppLocale>
+                  value={displayLocale}
+                  onChange={setDisplayLocale}
+                  options={[
+                    { value: 'zh', label: t('common.zh') },
+                    { value: 'en', label: t('common.en') },
+                  ]}
+                />
+              </Form.Item>
+              <Form.Item label={t('surveyEdit.successMessage')}>
+                <TextArea
+                  rows={3}
+                  value={successMessage}
+                  onChange={(e) => setSuccessMessage(e.target.value)}
+                  placeholder={defaultSuccessMessage}
+                />
               </Form.Item>
             </Form>
           </Card>
