@@ -1,0 +1,25 @@
+# Dependencies
+node_modules/
+web/dist/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Data
+data/files/
+*.enc
+
+# Go
+api/server
+api/tmp/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+.DS_Store
+
+# Logs
+*.log

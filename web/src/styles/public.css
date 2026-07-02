@@ -1,0 +1,60 @@
+.public-layout .public-card {
+  max-width: 640px;
+  margin: 0 auto;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  padding: 32px;
+}
+
+.survey-skin input,
+.survey-skin textarea,
+.survey-skin select {
+  width: 100%;
+  min-height: 40px;
+  border: 1px solid #d9dde4;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.survey-skin label {
+  display: block;
+  margin-bottom: 8px;
+  color: #1f2329;
+  font-weight: 500;
+}
+
+.login-page {
+  display: flex;
+  min-height: 100vh;
+}
+
+.login-brand {
+  flex: 1;
+  background: linear-gradient(135deg, #1677ff 0%, #0958d9 100%);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 64px;
+}
+
+.login-form-panel {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  padding: 32px;
+}
+
+@media (max-width: 768px) {
+  .login-brand {
+    display: none;
+  }
+  .login-form-panel {
+    flex: 1;
+  }
+}

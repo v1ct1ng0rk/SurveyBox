@@ -1,0 +1,5 @@
+server
+tmp
+*.log
+.env
+.env.*
