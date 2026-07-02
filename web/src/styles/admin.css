@@ -44,6 +44,14 @@
   overflow: hidden;
 }
 
+.admin-page .ant-table-thead > tr > th {
+  white-space: nowrap;
+}
+
+.admin-page .ant-table-tbody > tr > td.ant-table-cell-align-center {
+  font-variant-numeric: tabular-nums;
+}
+
 .admin-language-switcher.ant-select,
 .ant-pro-global-header .admin-language-switcher.ant-select {
   min-width: 108px;
@@ -53,10 +61,46 @@
 .ant-pro-global-header .admin-language-switcher.ant-select .ant-select-selector {
   height: 32px !important;
   padding-inline: 11px !important;
-  align-items: center;
+  display: flex !important;
+  align-items: center !important;
 }
 
 .admin-language-switcher.ant-select .ant-select-selection-item,
 .ant-pro-global-header .admin-language-switcher.ant-select .ant-select-selection-item {
-  line-height: 30px !important;
+  line-height: 1.2 !important;
+  padding-inline-end: 18px !important;
+}
+
+.admin-language-switcher.ant-select .ant-select-arrow,
+.ant-pro-global-header .admin-language-switcher.ant-select .ant-select-arrow {
+  top: 50% !important;
+  inset-block-start: auto !important;
+  margin-top: 0 !important;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  height: 12px;
+}
+
+/* Header: language switcher + username vertically centered */
+.admin-header-lang {
+  display: flex;
+  align-items: center;
+  height: 32px;
+}
+
+.ant-pro-global-header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ant-pro-global-header-header-actions {
+  display: flex;
+  align-items: center;
+}
+
+.ant-pro-global-header-header-actions-avatar {
+  display: flex;
+  align-items: center;
 }

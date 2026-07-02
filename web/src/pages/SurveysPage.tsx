@@ -67,22 +67,23 @@ export default function SurveysPage() {
   }
 
   const columns: ProColumns<SurveyItem>[] = [
-    { title: t('common.title'), dataIndex: 'title', ellipsis: true },
+    { title: t('common.title'), dataIndex: 'title', ellipsis: true, minWidth: 160 },
     {
       title: t('common.status'),
       dataIndex: 'status',
+      width: 100,
       render: (_, r) => {
         const s = surveyStatus(r.status)
         return <Tag color={s.color}>{s.text}</Tag>
       },
     },
-    { title: t('surveys.shareCount'), dataIndex: 'share_count', width: 80 },
-    { title: t('surveys.responseCount'), dataIndex: 'response_count', width: 80 },
+    { title: t('surveys.shareCount'), dataIndex: 'share_count', width: 96, align: 'center' },
+    { title: t('surveys.responseCount'), dataIndex: 'response_count', width: 112, align: 'center' },
     {
       title: t('common.updatedAt'),
       dataIndex: 'updated_at',
       valueType: 'dateTime',
-      width: 180,
+      width: 176,
     },
     {
       title: t('common.actions'),
@@ -125,7 +126,12 @@ export default function SurveysPage() {
         columns={columns}
         dataSource={data?.items || []}
         search={false}
-        pagination={{ pageSize: 20 }}
+        pagination={{
+          pageSize: 20,
+          showTotal: (total, range) =>
+            t('common.tableTotal', { start: range[0], end: range[1], total }),
+        }}
+        scroll={{ x: 880 }}
         toolBarRender={false}
       />
     </PageContainer>

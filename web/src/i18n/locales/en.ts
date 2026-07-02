@@ -24,6 +24,7 @@ export default {
     language: 'Language',
     zh: '中文',
     en: 'English',
+    tableTotal: '{{start}}–{{end}} of {{total}}',
   },
   nav: {
     dashboard: 'Dashboard',

@@ -24,6 +24,7 @@ export default {
     language: '语言',
     zh: '中文',
     en: 'English',
+    tableTotal: '第 {{start}}–{{end}} 条/共 {{total}} 条',
   },
   nav: {
     dashboard: '工作台',
