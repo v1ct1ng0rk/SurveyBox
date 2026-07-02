@@ -41,6 +41,13 @@ fi
 WEB_PORT="${WEB_PORT:-80}"
 export WEB_PORT
 
+POSTGRES_DATA_DIR="${POSTGRES_DATA_DIR:-/data/workspace/db/pg/SurveyBox}"
+export POSTGRES_DATA_DIR
+if [[ ! -d "$POSTGRES_DATA_DIR" ]]; then
+  info "创建 PostgreSQL 数据目录: $POSTGRES_DATA_DIR"
+  mkdir -p "$POSTGRES_DATA_DIR"
+fi
+
 info "构建镜像..."
 docker compose build
 
@@ -61,6 +68,7 @@ info ""
 info "部署完成"
 info "  访问地址: http://localhost:${WEB_PORT}"
 info "  默认账号: admin / admin123"
+info "  数据库目录: ${POSTGRES_DATA_DIR}"
 info ""
 info "常用命令:"
 info "  查看日志: docker compose logs -f"

@@ -32,8 +32,11 @@ chmod +x scripts/*.sh
 浏览器 → web (nginx:80) → /api/* 反代 → api:8080
                               ↓
                           postgres:5432
+                          数据目录 /data/workspace/db/pg/SurveyBox（宿主机挂载）
                           file_data 卷（加密附件）
 ```
+
+PostgreSQL 与 api、web 一同由 `docker compose` 启动；数据库文件持久化到宿主机 `POSTGRES_DATA_DIR`（默认 `/data/workspace/db/pg/SurveyBox`），可在 `.env` 中修改。
 
 生产环境请将 `WEB_ORIGIN` 设为实际域名（用于生成问卷分享链接）。
 
