@@ -14,6 +14,7 @@ import (
 	"github.com/victorking528/SurveyBox/api/internal/auth"
 	"github.com/victorking528/SurveyBox/api/internal/config"
 	"github.com/victorking528/SurveyBox/api/internal/contact"
+	"github.com/victorking528/SurveyBox/api/internal/dashboard"
 	"github.com/victorking528/SurveyBox/api/internal/database"
 	"github.com/victorking528/SurveyBox/api/internal/middleware"
 	publicapi "github.com/victorking528/SurveyBox/api/internal/publicapi"
@@ -69,6 +70,7 @@ func main() {
 	authSvc := auth.NewService(pool, cfg)
 	surveySvc := survey.NewService(pool, cfg, localStorage)
 	contactSvc := contact.NewService(pool)
+	dashboardSvc := dashboard.NewService(pool)
 	shareSvc := share.NewService(pool, cfg.WebOrigin)
 	publicSvc := publicapi.NewService(pool, localStorage, cfg.WebOrigin)
 	llmClient := llm.NewClient(cfg.LLMBaseURL, cfg.LLMAPIKey, cfg.LLMModel, cfg.LLMTimeout)
@@ -78,6 +80,7 @@ func main() {
 	surveySvc.RegisterRoutes(api.Group("/surveys"), authSvc)
 	shareSvc.RegisterRoutes(api.Group("/surveys"), authSvc)
 	contactSvc.RegisterRoutes(api.Group("/contacts"), authSvc)
+	dashboardSvc.RegisterRoutes(api.Group("/dashboard"), authSvc)
 	publicSvc.RegisterRoutes(api.Group("/public"))
 
 	api.POST("/admin/llm/ping", authSvc.AuthRequired(), func(c *gin.Context) {

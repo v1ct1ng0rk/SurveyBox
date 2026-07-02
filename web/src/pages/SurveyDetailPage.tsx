@@ -1,24 +1,61 @@
-import { useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  Button, Space, Table, Tabs, Tag, Typography, message, Modal, DatePicker, Checkbox,
+  Alert, Button, Space, Table, Tabs, Tag, Typography, message, Modal, DatePicker, Checkbox,
 } from 'antd'
-import { DownloadOutlined } from '@ant-design/icons'
+import { CopyOutlined, DownloadOutlined } from '@ant-design/icons'
 import { PageContainer } from '@ant-design/pro-components'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../lib/api'
+import { copyToClipboard } from '../lib/clipboard'
+import { useApiError, useDateLocale, useShareStatus, useSurveyStatus } from '../i18n/hooks'
+import ResponseAnswerCell from '../components/ResponseAnswerCell'
+import ResponseDetailDrawer from '../components/ResponseDetailDrawer'
+import ActionLink from '../components/ActionLink'
+import { buildAnswerRows, type AnswerFileMeta } from '../lib/formatAnswers'
 import dayjs from 'dayjs'
 
-const { Text, Paragraph } = Typography
+const { Text } = Typography
+
+type ResponseItem = {
+  id: string
+  contact_name: string
+  email: string
+  company: string
+  answers: Record<string, unknown>
+  files?: Record<string, AnswerFileMeta>
+  submitted_at: string
+}
+
+function normalizeFiles(raw?: Record<string, unknown>): Record<string, AnswerFileMeta> | undefined {
+  if (!raw) return undefined
+  const out: Record<string, AnswerFileMeta> = {}
+  for (const [fieldId, val] of Object.entries(raw)) {
+    if (val && typeof val === 'object' && 'filename' in val && 'file_id' in val) {
+      out[fieldId] = val as AnswerFileMeta
+    }
+  }
+  return Object.keys(out).length ? out : undefined
+}
 
 export default function SurveyDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
+  const apiError = useApiError()
+  const surveyStatus = useSurveyStatus()
+  const shareStatus = useShareStatus()
+  const dateLocale = useDateLocale()
   const [shareOpen, setShareOpen] = useState(false)
+  const [guideDismissed, setGuideDismissed] = useState(false)
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
   const [expiresAt, setExpiresAt] = useState<dayjs.Dayjs | null>(null)
   const [shareResult, setShareResult] = useState<Array<{ contact_name: string; fill_url: string }>>([])
+  const [detailResponse, setDetailResponse] = useState<ResponseItem | null>(null)
+  const [detailOpen, setDetailOpen] = useState(false)
 
   const { data: survey } = useQuery({
     queryKey: ['survey', id],
@@ -33,7 +70,16 @@ export default function SurveyDetailPage() {
 
   const { data: responses } = useQuery({
     queryKey: ['responses', id],
-    queryFn: async () => (await api.get(`/surveys/${id}/responses`)).data,
+    queryFn: async () => {
+      const { data } = await api.get(`/surveys/${id}/responses`)
+      return {
+        items: (data.items || []).map((item: ResponseItem & { answers: unknown; files?: Record<string, unknown> }) => ({
+          ...item,
+          answers: typeof item.answers === 'object' && item.answers ? item.answers as Record<string, unknown> : {},
+          files: normalizeFiles(item.files),
+        })),
+      }
+    },
     enabled: !!id,
   })
 
@@ -43,6 +89,30 @@ export default function SurveyDetailPage() {
     enabled: shareOpen,
   })
 
+  useEffect(() => {
+    if (searchParams.get('share') === '1' && survey?.status === 'published') {
+      setShareOpen(true)
+      setShareResult([])
+      const next = new URLSearchParams(searchParams)
+      next.delete('share')
+      setSearchParams(next, { replace: true })
+    }
+  }, [survey?.status, searchParams, setSearchParams])
+
+  const showPublishGuide = useMemo(() => {
+    if (guideDismissed || !survey || survey.status !== 'published') return false
+    if (searchParams.get('published') === '1') return true
+    return (shares?.items?.length ?? 0) === 0 && (responses?.items?.length ?? 0) === 0
+  }, [guideDismissed, survey, searchParams, shares, responses])
+
+  useEffect(() => {
+    if (searchParams.get('published') === '1') {
+      const next = new URLSearchParams(searchParams)
+      next.delete('published')
+      setSearchParams(next, { replace: true })
+    }
+  }, [searchParams, setSearchParams])
+
   const shareMutation = useMutation({
     mutationFn: async () =>
       api.post(`/surveys/${id}/shares`, {
@@ -50,20 +120,23 @@ export default function SurveyDetailPage() {
         expires_at: expiresAt?.toISOString() || null,
       }),
     onSuccess: (res) => {
-      message.success('分享成功')
+      message.success(t('surveyDetail.shareSuccess'))
       setShareResult(res.data.items || [])
+      setGuideDismissed(true)
       queryClient.invalidateQueries({ queryKey: ['shares', id] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-      message.error(msg || '分享失败')
+      message.error(apiError(msg, 'surveyDetail.shareFailed'))
     },
   })
 
-  const copyLink = (url: string) => {
-    navigator.clipboard.writeText(url)
-    message.success('链接已复制')
-  }
+  const renderCopyLink = (url: string, label?: string) => (
+    <ActionLink icon={<CopyOutlined />} onClick={() => void copyToClipboard(url)}>
+      {label ?? t('common.copyLink')}
+    </ActionLink>
+  )
 
   const exportResponses = async () => {
     try {
@@ -72,57 +145,78 @@ export default function SurveyDetailPage() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `${survey?.title || '问卷'}-答卷.zip`
+      a.download = `${survey?.title || t('surveyDetail.exportFilename')}.zip`
       a.click()
       URL.revokeObjectURL(url)
-      message.success('导出成功')
+      message.success(t('surveyDetail.exportSuccess'))
     } catch {
-      message.error('导出失败')
+      message.error(t('surveyDetail.exportFailed'))
     }
   }
+
+  const statusTag = survey ? surveyStatus(survey.status) : null
+  const detailRows = detailResponse
+    ? buildAnswerRows(survey?.schema, detailResponse.answers, detailResponse.files, t)
+    : []
 
   return (
     <PageContainer
       header={{
-        title: survey?.title || '问卷详情',
-        tags: survey ? [<Tag key="s">{survey.status}</Tag>] : [],
+        title: survey?.title || t('surveyDetail.title'),
+        tags: statusTag ? [<Tag key="s" color={statusTag.color}>{statusTag.text}</Tag>] : [],
         extra: (
           <Space>
             {survey?.status === 'draft' && (
-              <Button onClick={() => navigate(`/surveys/${id}/edit`)}>编辑</Button>
+              <Button onClick={() => navigate(`/surveys/${id}/edit`)}>{t('common.edit')}</Button>
             )}
             {survey?.status === 'published' && (
               <Button type="primary" onClick={() => { setShareResult([]); setShareOpen(true) }}>
-                批量分享
+                {t('surveyDetail.batchShare')}
               </Button>
             )}
           </Space>
         ),
       }}
     >
+      {showPublishGuide && (
+        <Alert
+          className="admin-guide-alert"
+          type="info"
+          showIcon
+          closable
+          onClose={() => setGuideDismissed(true)}
+          message={t('surveyDetail.publishGuideTitle')}
+          description={t('surveyDetail.publishGuideDesc')}
+          action={(
+            <Button size="small" type="primary" onClick={() => { setShareResult([]); setShareOpen(true) }}>
+              {t('surveyDetail.publishGuideAction')}
+            </Button>
+          )}
+        />
+      )}
+
       <Tabs
         items={[
           {
             key: 'shares',
-            label: '分享记录',
+            label: t('surveyDetail.shareRecords'),
             children: (
               <Table
                 rowKey="id"
                 dataSource={shares?.items || []}
                 columns={[
-                  { title: '联系人', dataIndex: 'contact_name' },
-                  { title: '邮箱', dataIndex: 'contact_email' },
-                  { title: '公司', dataIndex: 'company' },
+                  { title: t('surveyDetail.contact'), dataIndex: 'contact_name' },
+                  { title: t('common.email'), dataIndex: 'contact_email' },
+                  { title: t('common.company'), dataIndex: 'company' },
                   {
-                    title: '状态',
+                    title: t('common.status'),
                     dataIndex: 'status',
-                    render: (s: string) => <Tag>{s}</Tag>,
+                    render: (s: string) => <Tag>{shareStatus(s)}</Tag>,
                   },
                   {
-                    title: '链接',
-                    render: (_, r: { fill_url: string }) => (
-                      <Button size="small" onClick={() => copyLink(r.fill_url)}>复制链接</Button>
-                    ),
+                    title: t('surveyDetail.link'),
+                    width: 120,
+                    render: (_, r: { fill_url: string }) => renderCopyLink(r.fill_url),
                   },
                 ]}
               />
@@ -130,7 +224,7 @@ export default function SurveyDetailPage() {
           },
           {
             key: 'responses',
-            label: '答卷',
+            label: t('surveyDetail.responses'),
             children: (
               <>
                 <div style={{ marginBottom: 16 }}>
@@ -139,50 +233,77 @@ export default function SurveyDetailPage() {
                     onClick={exportResponses}
                     disabled={!responses?.items?.length}
                   >
-                    导出 ZIP（含附件）
+                    {t('surveyDetail.exportZip')}
                   </Button>
                 </div>
                 <Table
-                rowKey="id"
-                dataSource={responses?.items || []}
-                columns={[
-                  { title: '联系人', dataIndex: 'contact_name' },
-                  { title: '邮箱', dataIndex: 'email' },
-                  { title: '公司', dataIndex: 'company' },
-                  {
-                    title: '提交时间',
-                    dataIndex: 'submitted_at',
-                    render: (t: string) => new Date(t).toLocaleString(),
-                  },
-                  {
-                    title: '答案',
-                    dataIndex: 'answers',
-                    render: (a: Record<string, unknown>) => (
-                      <Paragraph ellipsis={{ rows: 2 }}>{JSON.stringify(a)}</Paragraph>
-                    ),
-                  },
-                ]}
-              />
+                  rowKey="id"
+                  dataSource={responses?.items || []}
+                  columns={[
+                    { title: t('surveyDetail.contact'), dataIndex: 'contact_name' },
+                    { title: t('common.email'), dataIndex: 'email' },
+                    { title: t('common.company'), dataIndex: 'company' },
+                    {
+                      title: t('surveyDetail.submittedAt'),
+                      dataIndex: 'submitted_at',
+                      render: (val: string) => new Date(val).toLocaleString(dateLocale),
+                    },
+                    {
+                      title: t('surveyDetail.answers'),
+                      dataIndex: 'answers',
+                      render: (answers: Record<string, unknown>, record: ResponseItem) => (
+                        <ResponseAnswerCell
+                          schema={survey?.schema}
+                          answers={answers}
+                          files={record.files}
+                          onView={() => {
+                            setDetailResponse(record)
+                            setDetailOpen(true)
+                          }}
+                        />
+                      ),
+                    },
+                  ]}
+                />
               </>
             ),
           },
         ]}
       />
 
+      <ResponseDetailDrawer
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        response={detailResponse}
+        rows={detailRows}
+      />
+
       <Modal
-        title="批量分享"
+        title={t('surveyDetail.batchShareTitle')}
         open={shareOpen}
-        onCancel={() => setShareOpen(false)}
-        onOk={() => shareMutation.mutate()}
+        onCancel={() => {
+          setShareOpen(false)
+          setShareResult([])
+        }}
+        onOk={() => {
+          if (shareResult.length > 0) {
+            setShareOpen(false)
+            setShareResult([])
+            return
+          }
+          shareMutation.mutate()
+        }}
+        okText={shareResult.length > 0 ? t('common.done') : t('surveyDetail.generateLinks')}
+        cancelText={t('common.cancel')}
         confirmLoading={shareMutation.isPending}
         width={640}
       >
         {shareResult.length === 0 ? (
           <>
-            <Text type="secondary">选择要分享的联系人</Text>
+            <Text type="secondary">{t('surveyDetail.selectContacts')}</Text>
             <div style={{ margin: '16px 0' }}>
               <DatePicker
-                placeholder="截止日期（可选）"
+                placeholder={t('surveyDetail.expiryPlaceholder')}
                 style={{ width: '100%', marginBottom: 16 }}
                 value={expiresAt}
                 onChange={setExpiresAt}
@@ -207,10 +328,21 @@ export default function SurveyDetailPage() {
             dataSource={shareResult}
             rowKey="fill_url"
             columns={[
-              { title: '联系人', dataIndex: 'contact_name' },
+              { title: t('surveyDetail.contact'), dataIndex: 'contact_name' },
               {
-                title: '操作',
-                render: (_, r) => <Button size="small" onClick={() => copyLink(r.fill_url)}>复制</Button>,
+                title: t('surveyDetail.fillLink'),
+                dataIndex: 'fill_url',
+                ellipsis: true,
+                render: (url: string) => (
+                  <Text ellipsis={{ tooltip: url }} style={{ maxWidth: 280 }}>
+                    {url}
+                  </Text>
+                ),
+              },
+              {
+                title: t('common.actions'),
+                width: 100,
+                render: (_, r) => renderCopyLink(r.fill_url, t('common.copy')),
               },
             ]}
           />

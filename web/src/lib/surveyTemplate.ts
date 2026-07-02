@@ -105,12 +105,26 @@ export const SURVEY_FORM_CSS = `
   }
 `
 
+export type SurveyTemplateLabels = {
+  option1: string
+  option2: string
+  inputPlaceholder: string
+  fileUpload: string
+}
+
+const DEFAULT_LABELS: SurveyTemplateLabels = {
+  option1: '选项 1',
+  option2: '选项 2',
+  inputPlaceholder: '请输入',
+  fileUpload: '点击或拖拽上传文件',
+}
+
 function requiredMark(required?: boolean) {
   return required ? '<span class="required">*</span>' : ''
 }
 
-function renderOptions(f: SurveyField, inputType: 'radio' | 'checkbox') {
-  const options = f.options?.length ? f.options : ['选项 1', '选项 2']
+function renderOptions(f: SurveyField, inputType: 'radio' | 'checkbox', labels: SurveyTemplateLabels) {
+  const options = f.options?.length ? f.options : [labels.option1, labels.option2]
   return `<div class="survey-options">${options
     .map(
       (o) =>
@@ -119,7 +133,7 @@ function renderOptions(f: SurveyField, inputType: 'radio' | 'checkbox') {
     .join('')}</div>`
 }
 
-export function defaultHTML(fields: SurveyField[]) {
+export function defaultHTML(fields: SurveyField[], labels: SurveyTemplateLabels = DEFAULT_LABELS) {
   const body = fields
     .map((f) => {
       if (f.type === 'section') {
@@ -127,28 +141,28 @@ export function defaultHTML(fields: SurveyField[]) {
       }
       const label = `<label class="survey-label" data-field-id="${f.id}">${f.label}${requiredMark(f.required)}</label>`
       if (f.type === 'textarea') {
-        return `<div class="survey-field">${label}<textarea class="survey-textarea" data-field-id="${f.id}" data-type="textarea" placeholder="请输入"></textarea></div>`
+        return `<div class="survey-field">${label}<textarea class="survey-textarea" data-field-id="${f.id}" data-type="textarea" placeholder="${labels.inputPlaceholder}"></textarea></div>`
       }
       if (f.type === 'file') {
-        return `<div class="survey-field">${label}<div class="survey-file" data-field-id="${f.id}" data-type="file">点击或拖拽上传文件</div><input data-field-id="${f.id}" data-type="file" type="file" hidden /></div>`
+        return `<div class="survey-field">${label}<div class="survey-file" data-field-id="${f.id}" data-type="file">${labels.fileUpload}</div><input data-field-id="${f.id}" data-type="file" type="file" hidden /></div>`
       }
       if (f.type === 'select') {
-        const options = f.options?.length ? f.options : ['选项 1', '选项 2']
+        const options = f.options?.length ? f.options : [labels.option1, labels.option2]
         return `<div class="survey-field">${label}<select class="survey-select" data-field-id="${f.id}" data-type="select">${options.map((o) => `<option value="${o}">${o}</option>`).join('')}</select></div>`
       }
       if (f.type === 'radio') {
-        return `<div class="survey-field">${label}${renderOptions(f, 'radio')}</div>`
+        return `<div class="survey-field">${label}${renderOptions(f, 'radio', labels)}</div>`
       }
       if (f.type === 'checkbox') {
-        return `<div class="survey-field">${label}${renderOptions(f, 'checkbox')}</div>`
+        return `<div class="survey-field">${label}${renderOptions(f, 'checkbox', labels)}</div>`
       }
       const inputType = f.type === 'number' ? 'number' : 'text'
-      return `<div class="survey-field">${label}<input class="survey-input" data-field-id="${f.id}" data-type="${f.type}" type="${inputType}" placeholder="请输入" /></div>`
+      return `<div class="survey-field">${label}<input class="survey-input" data-field-id="${f.id}" data-type="${f.type}" type="${inputType}" placeholder="${labels.inputPlaceholder}" /></div>`
     })
     .join('')
   return `<form class="survey-form">${body}</form>`
 }
 
-export function buildPreviewDocument(html: string, fields: SurveyField[]) {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${SURVEY_FORM_CSS}</style></head><body class="survey-skin">${html || defaultHTML(fields)}</body></html>`
+export function buildPreviewDocument(html: string, fields: SurveyField[], labels?: SurveyTemplateLabels) {
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${SURVEY_FORM_CSS}</style></head><body class="survey-skin">${html || defaultHTML(fields, labels)}</body></html>`
 }

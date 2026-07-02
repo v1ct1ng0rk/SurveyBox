@@ -341,12 +341,13 @@ func (s *Service) listResponses(c *gin.Context) {
 	}
 	defer rows.Close()
 	type item struct {
-		ID          string          `json:"id"`
-		ContactName string          `json:"contact_name"`
-		Email       string          `json:"email"`
-		Company     string          `json:"company"`
-		Answers     json.RawMessage `json:"answers"`
-		SubmittedAt time.Time       `json:"submitted_at"`
+		ID          string                 `json:"id"`
+		ContactName string                 `json:"contact_name"`
+		Email       string                 `json:"email"`
+		Company     string                 `json:"company"`
+		Answers     json.RawMessage        `json:"answers"`
+		Files       map[string]interface{} `json:"files"`
+		SubmittedAt time.Time              `json:"submitted_at"`
 	}
 	var items []item
 	for rows.Next() {
@@ -355,12 +356,37 @@ func (s *Service) listResponses(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "读取失败"})
 			return
 		}
+		it.Files = s.loadResponseFiles(c, it.ID)
 		items = append(items, it)
 	}
 	if items == nil {
 		items = []item{}
 	}
 	c.JSON(http.StatusOK, gin.H{"items": items})
+}
+
+func (s *Service) loadResponseFiles(c *gin.Context, responseID string) map[string]interface{} {
+	rows, err := s.pool.Query(c, `
+		SELECT field_id, id::text, filename
+		FROM files
+		WHERE response_id = $1 AND status IN ('uploaded', 'bound')
+	`, responseID)
+	if err != nil {
+		return map[string]interface{}{}
+	}
+	defer rows.Close()
+	files := make(map[string]interface{})
+	for rows.Next() {
+		var fieldID, fileID, filename string
+		if err := rows.Scan(&fieldID, &fileID, &filename); err != nil {
+			continue
+		}
+		files[fieldID] = map[string]string{"file_id": fileID, "filename": filename}
+	}
+	if len(files) == 0 {
+		return map[string]interface{}{}
+	}
+	return files
 }
 
 func (s *Service) preview(c *gin.Context) {

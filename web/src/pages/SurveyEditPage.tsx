@@ -6,36 +6,36 @@ import {
 import { EyeOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { PageContainer } from '@ant-design/pro-components'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../lib/api'
-import { buildPreviewDocument, defaultHTML, type SurveyField } from '../lib/surveyTemplate'
+import { buildPreviewDocument, defaultHTML, type SurveyField, type SurveyTemplateLabels } from '../lib/surveyTemplate'
+import { useApiError, useSurveyStatus } from '../i18n/hooks'
+import PublishSuccessModal from '../components/PublishSuccessModal'
 
 const { TextArea } = Input
 const { Text } = Typography
 
-const fieldTypes = [
-  { value: 'text', label: '单行文本' },
-  { value: 'textarea', label: '多行文本' },
-  { value: 'number', label: '数字' },
-  { value: 'select', label: '下拉选择' },
-  { value: 'radio', label: '单选' },
-  { value: 'checkbox', label: '多选' },
-  { value: 'file', label: '文件上传' },
-  { value: 'section', label: '分段标题' },
-]
+const FIELD_TYPE_KEYS = ['text', 'textarea', 'number', 'select', 'radio', 'checkbox', 'file', 'section'] as const
+const PROMPT_CHIP_KEYS = ['chipSatisfaction', 'chipNps', 'chipFile', 'chipMulti'] as const
 
-const promptChips = ['客户满意度', 'NPS 评分', '文件上传', '多选题']
-
-function buildSurveyPayload(fields: SurveyField[], title: string, description: string, html: string) {
+function buildSurveyPayload(fields: SurveyField[], title: string, description: string, html: string, labels: SurveyTemplateLabels) {
   return {
     title,
     description,
     schema: { version: 1, fields },
-    html_template: html || defaultHTML(fields),
+    html_template: html || defaultHTML(fields, labels),
   }
 }
 
-async function persistSurvey(id: string | undefined, fields: SurveyField[], title: string, description: string, html: string) {
-  const payload = buildSurveyPayload(fields, title, description, html)
+async function persistSurvey(
+  id: string | undefined,
+  fields: SurveyField[],
+  title: string,
+  description: string,
+  html: string,
+  labels: SurveyTemplateLabels,
+) {
+  const payload = buildSurveyPayload(fields, title, description, html, labels)
   if (id === 'new') {
     const { data } = await api.post('/surveys')
     await api.put(`/surveys/${data.id}`, payload)
@@ -49,12 +49,37 @@ export default function SurveyEditPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { t, i18n } = useTranslation()
+  const apiError = useApiError()
+  const surveyStatus = useSurveyStatus()
   const [fields, setFields] = useState<SurveyField[]>([])
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [html, setHtml] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [llmPrompt, setLlmPrompt] = useState('')
+  const [publishSuccessOpen, setPublishSuccessOpen] = useState(false)
+  const [publishedId, setPublishedId] = useState<string | null>(null)
+
+  const templateLabels = useMemo<SurveyTemplateLabels>(
+    () => ({
+      option1: t('template.option1'),
+      option2: t('template.option2'),
+      inputPlaceholder: t('template.inputPlaceholder'),
+      fileUpload: t('template.fileUpload'),
+    }),
+    [t, i18n.language],
+  )
+
+  const fieldTypes = useMemo(
+    () => FIELD_TYPE_KEYS.map((value) => ({ value, label: t(`fieldType.${value}`) })),
+    [t, i18n.language],
+  )
+
+  const promptChips = useMemo(
+    () => PROMPT_CHIP_KEYS.map((key) => ({ key, label: t(`surveyEdit.${key}`) })),
+    [t, i18n.language],
+  )
 
   const { data: survey, isLoading, isError } = useQuery({
     queryKey: ['survey', id],
@@ -73,17 +98,19 @@ export default function SurveyEditPage() {
     }
   }, [survey])
 
+  const syncHTML = (next: SurveyField[]) => setHtml(defaultHTML(next, templateLabels))
+
   const saveMutation = useMutation({
-    mutationFn: async () => persistSurvey(id, fields, title, description, html),
+    mutationFn: async () => persistSurvey(id, fields, title, description, html, templateLabels),
     onSuccess: (surveyId) => {
-      message.success('已保存')
+      message.success(t('surveyEdit.saved'))
       queryClient.invalidateQueries({ queryKey: ['surveys'] })
       queryClient.invalidateQueries({ queryKey: ['survey', surveyId] })
       if (id === 'new') navigate(`/surveys/${surveyId}/edit`, { replace: true })
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-      message.error(msg || '保存失败')
+      message.error(apiError(msg, 'surveyEdit.saveFailed'))
     },
   })
 
@@ -93,7 +120,7 @@ export default function SurveyEditPage() {
       return data
     },
     onSuccess: (data) => {
-      message.success('生成成功')
+      message.success(t('surveyEdit.generateSuccess'))
       if (data.title) setTitle(data.title)
       if (data.description) setDescription(data.description)
       if (data.schema?.fields) setFields(data.schema.fields)
@@ -101,42 +128,43 @@ export default function SurveyEditPage() {
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-      message.error(msg || '生成失败，请检查 LLM_API_KEY 配置')
+      message.error(apiError(msg, 'surveyEdit.generateFailed'))
     },
   })
 
   const publishMutation = useMutation({
     mutationFn: async () => {
       if (fields.length === 0) {
-        throw new Error('请至少添加一个字段后再发布')
+        throw new Error(t('surveyEdit.publishNeedFields'))
       }
-      const surveyId = await persistSurvey(id, fields, title, description, html)
+      const surveyId = await persistSurvey(id, fields, title, description, html, templateLabels)
       await api.post(`/surveys/${surveyId}/publish`)
       return surveyId
     },
     onSuccess: (surveyId) => {
-      message.success('发布成功')
       queryClient.invalidateQueries({ queryKey: ['surveys'] })
       queryClient.invalidateQueries({ queryKey: ['survey', surveyId] })
-      navigate(`/surveys/${surveyId}`)
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
+      setPublishedId(surveyId)
+      setPublishSuccessOpen(true)
     },
     onError: (err: unknown) => {
       const axiosMsg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-      const msg = axiosMsg || (err instanceof Error ? err.message : '发布失败')
+      const msg = axiosMsg
+        ? apiError(axiosMsg)
+        : (err instanceof Error ? err.message : t('surveyEdit.publishFailed'))
       message.error(msg)
     },
   })
 
   const previewSrcDoc = useMemo(
-    () => buildPreviewDocument(html, fields),
-    [html, fields],
+    () => buildPreviewDocument(html, fields, templateLabels),
+    [html, fields, templateLabels],
   )
-
-  const syncHTML = (next: SurveyField[]) => setHtml(defaultHTML(next))
 
   const addField = () => {
     const fid = `field_${Date.now()}`
-    const next = [...fields, { id: fid, type: 'text', label: '新问题', required: false }]
+    const next = [...fields, { id: fid, type: 'text', label: t('surveyEdit.newQuestion'), required: false }]
     setFields(next)
     syncHTML(next)
   }
@@ -148,11 +176,11 @@ export default function SurveyEditPage() {
       <PageContainer>
         <Result
           status="404"
-          title="问卷不存在"
-          subTitle="该问卷可能已删除，或当前账号无权访问。请返回问卷管理重新创建。"
+          title={t('surveyEdit.notFoundTitle')}
+          subTitle={t('surveyEdit.notFoundDesc')}
           extra={(
             <Button type="primary" onClick={() => navigate('/surveys')}>
-              返回问卷管理
+              {t('surveyEdit.backToList')}
             </Button>
           )}
         />
@@ -162,18 +190,19 @@ export default function SurveyEditPage() {
 
   const isDraft = id === 'new' || !survey || survey.status === 'draft'
   const canPublish = isDraft && fields.length > 0
+  const statusTag = survey ? surveyStatus(survey.status) : { color: 'default', text: t('surveyStatus.draft') }
 
   return (
     <PageContainer
       header={{
-        title: title || '未命名问卷',
-        tags: survey ? [<Tag key="s">{survey.status}</Tag>] : [<Tag key="s">草稿</Tag>],
+        title: title || t('surveyEdit.untitled'),
+        tags: [<Tag key="s" color={statusTag.color}>{statusTag.text}</Tag>],
         extra: (
           <Space>
             <Button icon={<EyeOutlined />} onClick={() => setPreviewOpen(true)} disabled={fields.length === 0}>
-              预览
+              {t('common.preview')}
             </Button>
-            <Button loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>保存草稿</Button>
+            <Button loading={saveMutation.isPending} onClick={() => saveMutation.mutate()}>{t('surveyEdit.saveDraft')}</Button>
             {canPublish && (
               <Button
                 type="primary"
@@ -181,7 +210,7 @@ export default function SurveyEditPage() {
                 disabled={saveMutation.isPending}
                 onClick={() => publishMutation.mutate()}
               >
-                发布
+                {t('common.publish')}
               </Button>
             )}
           </Space>
@@ -190,18 +219,18 @@ export default function SurveyEditPage() {
     >
       <Row gutter={16}>
         <Col xs={24} lg={9}>
-          <Card title="AI 生成" size="small" style={{ marginBottom: 16 }}>
+          <Card title={t('surveyEdit.aiGenerate')} size="small" style={{ marginBottom: 16 }}>
             <TextArea
               rows={4}
-              placeholder="描述您想要的问卷，如：客户满意度调查，含 NPS 和合同上传"
+              placeholder={t('surveyEdit.aiPromptPlaceholder')}
               value={llmPrompt}
               onChange={(e) => setLlmPrompt(e.target.value)}
               disabled={id === 'new'}
             />
             <Space wrap style={{ margin: '8px 0' }}>
               {promptChips.map((c) => (
-                <Button key={c} size="small" onClick={() => setLlmPrompt((p) => (p ? p + '、' + c : c))}>
-                  {c}
+                <Button key={c.key} size="small" onClick={() => setLlmPrompt((p) => (p ? `${p}、${c.label}` : c.label))}>
+                  {c.label}
                 </Button>
               ))}
             </Space>
@@ -213,30 +242,30 @@ export default function SurveyEditPage() {
               disabled={id === 'new' || !llmPrompt}
               onClick={() => generateMutation.mutate()}
             >
-              生成问卷
+              {t('surveyEdit.generateSurvey')}
             </Button>
-            {id === 'new' && <Text type="secondary" style={{ fontSize: 12 }}>请先保存草稿后再使用 AI 生成</Text>}
+            {id === 'new' && <Text type="secondary" style={{ fontSize: 12 }}>{t('surveyEdit.saveBeforeAi')}</Text>}
           </Card>
-          <Card title="问卷信息" size="small">
+          <Card title={t('surveyEdit.surveyInfo')} size="small">
             <Form layout="vertical">
-              <Form.Item label="标题">
-                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="请输入问卷标题" />
+              <Form.Item label={t('surveyEdit.surveyTitle')}>
+                <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('surveyEdit.surveyTitlePlaceholder')} />
               </Form.Item>
-              <Form.Item label="说明">
-                <TextArea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder="向填写者说明问卷目的" />
+              <Form.Item label={t('surveyEdit.surveyDesc')}>
+                <TextArea rows={3} value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('surveyEdit.surveyDescPlaceholder')} />
               </Form.Item>
             </Form>
           </Card>
         </Col>
         <Col xs={24} lg={15}>
           <Card
-            title="字段结构"
+            title={t('surveyEdit.fieldStructure')}
             size="small"
-            extra={<Button size="small" type="primary" onClick={addField}>添加字段</Button>}
+            extra={<Button size="small" type="primary" onClick={addField}>{t('surveyEdit.addField')}</Button>}
             styles={{ body: { maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' } }}
           >
             {fields.length === 0 ? (
-              <Empty description="暂无字段，点击右上角添加" image={Empty.PRESENTED_IMAGE_SIMPLE} />
+              <Empty description={t('surveyEdit.emptyFields')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
             ) : (
               fields.map((f, idx) => (
                 <Card key={f.id} size="small" style={{ marginBottom: 8 }} styles={{ body: { padding: 12 } }}>
@@ -255,7 +284,7 @@ export default function SurveyEditPage() {
                   <Input
                     size="small"
                     value={f.label}
-                    placeholder="字段标题"
+                    placeholder={t('surveyEdit.fieldTitle')}
                     onChange={(e) => {
                       const next = [...fields]
                       next[idx] = { ...f, label: e.target.value }
@@ -265,7 +294,7 @@ export default function SurveyEditPage() {
                   />
                   <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <span>
-                      <Text type="secondary" style={{ fontSize: 12 }}>必填 </Text>
+                      <Text type="secondary" style={{ fontSize: 12 }}>{t('surveyEdit.required')} </Text>
                       <Switch
                         size="small"
                         checked={!!f.required}
@@ -286,7 +315,7 @@ export default function SurveyEditPage() {
                         syncHTML(next)
                       }}
                     >
-                      删除
+                      {t('common.delete')}
                     </Button>
                   </div>
                 </Card>
@@ -297,14 +326,14 @@ export default function SurveyEditPage() {
       </Row>
 
       <Modal
-        title="填写预览"
+        title={t('surveyEdit.previewTitle')}
         open={previewOpen}
         onCancel={() => setPreviewOpen(false)}
         footer={null}
         width={760}
         destroyOnClose
       >
-        <Text type="secondary">预览模式，不可提交</Text>
+        <Text type="secondary">{t('surveyEdit.previewHint')}</Text>
         <iframe
           title="preview-modal"
           sandbox="allow-forms"
@@ -312,6 +341,19 @@ export default function SurveyEditPage() {
           srcDoc={previewSrcDoc}
         />
       </Modal>
+
+      <PublishSuccessModal
+        open={publishSuccessOpen}
+        title={title || t('surveyEdit.untitled')}
+        onShareNow={() => {
+          setPublishSuccessOpen(false)
+          if (publishedId) navigate(`/surveys/${publishedId}?share=1`)
+        }}
+        onLater={() => {
+          setPublishSuccessOpen(false)
+          if (publishedId) navigate(`/surveys/${publishedId}?published=1`)
+        }}
+      />
     </PageContainer>
   )
 }

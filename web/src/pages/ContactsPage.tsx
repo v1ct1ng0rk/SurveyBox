@@ -5,7 +5,10 @@ import { ProTable } from '@ant-design/pro-components'
 import type { ProColumns } from '@ant-design/pro-components'
 import { PageContainer } from '@ant-design/pro-components'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../lib/api'
+import { useApiError } from '../i18n/hooks'
+import ActionLink from '../components/ActionLink'
 
 type Contact = {
   id: string
@@ -20,6 +23,8 @@ export default function ContactsPage() {
   const [editing, setEditing] = useState<Contact | null>(null)
   const [form] = Form.useForm()
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
+  const apiError = useApiError()
 
   const { data, isLoading } = useQuery({
     queryKey: ['contacts'],
@@ -34,7 +39,7 @@ export default function ContactsPage() {
       return api.post('/contacts', values)
     },
     onSuccess: () => {
-      message.success(editing ? '已更新' : '已创建')
+      message.success(editing ? t('contacts.updated') : t('contacts.created'))
       setOpen(false)
       setEditing(null)
       form.resetFields()
@@ -42,54 +47,55 @@ export default function ContactsPage() {
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-      message.error(msg || '保存失败')
+      message.error(apiError(msg, 'contacts.saveFailed'))
     },
   })
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.delete(`/contacts/${id}`),
     onSuccess: () => {
-      message.success('已删除')
+      message.success(t('contacts.deleted'))
       queryClient.invalidateQueries({ queryKey: ['contacts'] })
     },
   })
 
   const columns: ProColumns<Contact>[] = [
-    { title: '名称', dataIndex: 'name' },
-    { title: '邮箱', dataIndex: 'email' },
-    { title: '公司', dataIndex: 'company' },
+    { title: t('common.name'), dataIndex: 'name' },
+    { title: t('common.email'), dataIndex: 'email' },
+    { title: t('common.company'), dataIndex: 'company' },
     {
-      title: '创建时间',
+      title: t('common.createdAt'),
       dataIndex: 'created_at',
       valueType: 'dateTime',
       width: 180,
     },
     {
-      title: '操作',
+      title: t('common.actions'),
       valueType: 'option',
-      render: (_, r) => [
-        <a
-          key="edit"
-          onClick={() => {
-            setEditing(r)
-            form.setFieldsValue(r)
-            setOpen(true)
-          }}
-        >
-          编辑
-        </a>,
-        <Popconfirm key="del" title="确定删除？" onConfirm={() => deleteMutation.mutate(r.id)}>
-          <a style={{ color: '#ff4d4f' }}>删除</a>
-        </Popconfirm>,
-      ],
+      render: (_, r) => (
+        <div className="admin-table-actions">
+          <ActionLink
+            onClick={() => {
+              setEditing(r)
+              form.setFieldsValue(r)
+              setOpen(true)
+            }}
+          >
+            {t('common.edit')}
+          </ActionLink>
+          <Popconfirm title={t('contacts.confirmDelete')} onConfirm={() => deleteMutation.mutate(r.id)}>
+            <ActionLink danger>{t('common.delete')}</ActionLink>
+          </Popconfirm>
+        </div>
+      ),
     },
   ]
 
   return (
     <PageContainer
       header={{
-        title: '联系人管理',
-        subTitle: '管理问卷分享对象',
+        title: t('contacts.title'),
+        subTitle: t('contacts.subtitle'),
         extra: [
           <Button
             key="add"
@@ -101,7 +107,7 @@ export default function ContactsPage() {
               setOpen(true)
             }}
           >
-            新建联系人
+            {t('contacts.newContact')}
           </Button>,
         ],
       }}
@@ -117,20 +123,22 @@ export default function ContactsPage() {
       />
 
       <Modal
-        title={editing ? '编辑联系人' : '新建联系人'}
+        title={editing ? t('contacts.editContact') : t('contacts.newContact')}
         open={open}
         onCancel={() => setOpen(false)}
         onOk={() => form.submit()}
         confirmLoading={saveMutation.isPending}
+        okText={t('common.confirm')}
+        cancelText={t('common.cancel')}
       >
         <Form form={form} layout="vertical" onFinish={(v) => saveMutation.mutate(v)}>
-          <Form.Item name="name" label="名称" rules={[{ required: true }]}>
+          <Form.Item name="name" label={t('common.name')} rules={[{ required: true }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="email" label="邮箱" rules={[{ required: true, type: 'email' }]}>
+          <Form.Item name="email" label={t('common.email')} rules={[{ required: true, type: 'email' }]}>
             <Input />
           </Form.Item>
-          <Form.Item name="company" label="公司">
+          <Form.Item name="company" label={t('common.company')}>
             <Input />
           </Form.Item>
         </Form>

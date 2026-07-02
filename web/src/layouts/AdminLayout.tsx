@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -9,24 +9,31 @@ import { ProLayout } from '@ant-design/pro-components'
 import { Dropdown, Spin } from 'antd'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
+import { useTranslation } from 'react-i18next'
 import api from '../lib/api'
-
-const menuRoutes = [
-  { path: '/dashboard', name: '工作台', icon: <DashboardOutlined /> },
-  { path: '/surveys', name: '问卷管理', icon: <FileTextOutlined /> },
-  { path: '/contacts', name: '联系人', icon: <TeamOutlined /> },
-  { path: '/settings', name: '设置', icon: <SettingOutlined /> },
-]
+import LanguageSwitcher from '../components/LanguageSwitcher'
+import '../styles/admin.css'
 
 export default function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { t, i18n } = useTranslation()
   const { data: user, isLoading, isError } = useQuery({
     queryKey: ['me'],
     queryFn: async () => (await api.get('/auth/me')).data,
     retry: false,
     refetchOnWindowFocus: false,
   })
+
+  const menuRoutes = useMemo(
+    () => [
+      { path: '/dashboard', name: t('nav.dashboard'), icon: <DashboardOutlined /> },
+      { path: '/surveys', name: t('nav.surveys'), icon: <FileTextOutlined /> },
+      { path: '/contacts', name: t('nav.contacts'), icon: <TeamOutlined /> },
+      { path: '/settings', name: t('nav.settings'), icon: <SettingOutlined /> },
+    ],
+    [t, i18n.language],
+  )
 
   useEffect(() => {
     if (!isLoading && (isError || !user)) {
@@ -54,6 +61,7 @@ export default function AdminLayout() {
       fixSiderbar
       location={{ pathname: location.pathname }}
       route={{ routes: menuRoutes }}
+      actionsRender={() => [<LanguageSwitcher key="lang" size="small" />]}
       menuItemRender={(item, dom) => (
         <a
           onClick={(e) => {
@@ -72,7 +80,7 @@ export default function AdminLayout() {
               items: [
                 {
                   key: 'logout',
-                  label: '退出登录',
+                  label: t('nav.logout'),
                   onClick: async () => {
                     await api.post('/auth/logout')
                     localStorage.removeItem('access_token')
@@ -88,7 +96,9 @@ export default function AdminLayout() {
       }}
       contentStyle={{ padding: 24, maxWidth: 1440, margin: '0 auto' }}
     >
-      <Outlet />
+      <div className="admin-page">
+        <Outlet />
+      </div>
     </ProLayout>
   )
 }

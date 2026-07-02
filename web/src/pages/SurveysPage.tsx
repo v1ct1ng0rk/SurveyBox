@@ -5,7 +5,10 @@ import { ProTable } from '@ant-design/pro-components'
 import type { ProColumns } from '@ant-design/pro-components'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PageContainer } from '@ant-design/pro-components'
+import { useTranslation } from 'react-i18next'
 import api from '../lib/api'
+import { useApiError, useSurveyStatus } from '../i18n/hooks'
+import ActionLink from '../components/ActionLink'
 
 type SurveyItem = {
   id: string
@@ -17,16 +20,12 @@ type SurveyItem = {
   updated_at: string
 }
 
-const statusMap: Record<string, { color: string; text: string }> = {
-  draft: { color: 'default', text: '草稿' },
-  published: { color: 'success', text: '进行中' },
-  paused: { color: 'warning', text: '已结束' },
-  archived: { color: 'default', text: '已归档' },
-}
-
 export default function SurveysPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
+  const { t } = useTranslation()
+  const apiError = useApiError()
+  const surveyStatus = useSurveyStatus()
 
   const { data, isLoading } = useQuery({
     queryKey: ['surveys'],
@@ -36,7 +35,7 @@ export default function SurveysPage() {
   const createMutation = useMutation({
     mutationFn: async () => (await api.post('/surveys')).data,
     onSuccess: (data) => {
-      message.success('已创建问卷')
+      message.success(t('surveys.created'))
       queryClient.invalidateQueries({ queryKey: ['surveys'] })
       navigate(`/surveys/${data.id}/edit`)
     },
@@ -45,65 +44,68 @@ export default function SurveysPage() {
   const closeMutation = useMutation({
     mutationFn: async (surveyId: string) => api.post(`/surveys/${surveyId}/close`),
     onSuccess: () => {
-      message.success('问卷已结束，分享链接将无法打开')
+      message.success(t('surveys.closeSuccess'))
       queryClient.invalidateQueries({ queryKey: ['surveys'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
     },
     onError: (err: unknown) => {
       const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-      message.error(msg || '操作失败')
+      message.error(apiError(msg, 'surveys.operationFailed'))
     },
   })
 
   const confirmClose = (item: SurveyItem) => {
     Modal.confirm({
-      title: '结束问卷',
+      title: t('surveys.closeTitle'),
       icon: <ExclamationCircleOutlined />,
-      content: `确定结束「${item.title}」吗？结束后将不再接收新的回答，已发出的分享链接将无法打开。`,
-      okText: '结束',
+      content: t('surveys.closeContent', { title: item.title }),
+      okText: t('common.close'),
       okType: 'danger',
-      cancelText: '取消',
+      cancelText: t('common.cancel'),
       onOk: () => closeMutation.mutateAsync(item.id),
     })
   }
 
   const columns: ProColumns<SurveyItem>[] = [
-    { title: '标题', dataIndex: 'title', ellipsis: true },
+    { title: t('common.title'), dataIndex: 'title', ellipsis: true },
     {
-      title: '状态',
+      title: t('common.status'),
       dataIndex: 'status',
       render: (_, r) => {
-        const s = statusMap[r.status] || { color: 'default', text: r.status }
+        const s = surveyStatus(r.status)
         return <Tag color={s.color}>{s.text}</Tag>
       },
     },
-    { title: '分享数', dataIndex: 'share_count', width: 80 },
-    { title: '提交数', dataIndex: 'response_count', width: 80 },
+    { title: t('surveys.shareCount'), dataIndex: 'share_count', width: 80 },
+    { title: t('surveys.responseCount'), dataIndex: 'response_count', width: 80 },
     {
-      title: '更新时间',
+      title: t('common.updatedAt'),
       dataIndex: 'updated_at',
       valueType: 'dateTime',
       width: 180,
     },
     {
-      title: '操作',
+      title: t('common.actions'),
       valueType: 'option',
-      width: 220,
-      render: (_, r) => [
-        <a key="edit" onClick={() => navigate(`/surveys/${r.id}/edit`)}>编辑</a>,
-        r.status === 'published' && (
-          <a key="close" onClick={() => confirmClose(r)}>结束</a>
-        ),
-        (r.status === 'published' || r.status === 'paused') && (
-          <a key="detail" onClick={() => navigate(`/surveys/${r.id}`)}>详情</a>
-        ),
-      ],
+      width: 240,
+      render: (_, r) => (
+        <div className="admin-table-actions">
+          <ActionLink onClick={() => navigate(`/surveys/${r.id}/edit`)}>{t('common.edit')}</ActionLink>
+          {r.status === 'published' && (
+            <ActionLink danger onClick={() => confirmClose(r)}>{t('common.close')}</ActionLink>
+          )}
+          {(r.status === 'published' || r.status === 'paused') && (
+            <ActionLink onClick={() => navigate(`/surveys/${r.id}`)}>{t('common.detail')}</ActionLink>
+          )}
+        </div>
+      ),
     },
   ]
 
   return (
     <PageContainer
       header={{
-        title: '问卷管理',
+        title: t('surveys.title'),
         extra: [
           <Button
             key="new"
@@ -112,7 +114,7 @@ export default function SurveysPage() {
             loading={createMutation.isPending}
             onClick={() => createMutation.mutate()}
           >
-            新建问卷
+            {t('surveys.newSurvey')}
           </Button>,
         ],
       }}
