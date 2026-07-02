@@ -29,11 +29,11 @@ chmod +x scripts/*.sh
 ### Docker 架构
 
 ```
-浏览器 → web (nginx:80) → /api/* 反代 → api:8080
-                              ↓
-                          postgres:5432
-                          数据目录 /data/workspace/db/pg/SurveyBox（宿主机挂载）
-                          file_data 卷（加密附件）
+浏览器 → web (nginx:80，唯一对外端口)
+              ├── 静态前端
+              └── /api/* → 127.0.0.1:8080（api 共享 web 网络栈，不暴露宿主机）
+                        ↓
+                    postgres:5432（Docker 内网）
 ```
 
 PostgreSQL 与 api、web 一同由 `docker compose` 启动；数据库文件持久化到宿主机 `POSTGRES_DATA_DIR`（默认 `/data/workspace/db/pg/SurveyBox`），可在 `.env` 中修改。

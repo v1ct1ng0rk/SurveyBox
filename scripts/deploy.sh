@@ -75,7 +75,7 @@ if ! docker compose up -d; then
 fi
 
 info "等待 API 健康检查..."
-for i in {1..60}; do
+for i in {1..90}; do
   status="$(docker inspect surveybox-api --format '{{.State.Health.Status}}' 2>/dev/null || echo unknown)"
   if [[ "$status" == "healthy" ]]; then
     break
@@ -87,6 +87,11 @@ for i in {1..60}; do
   fi
   sleep 2
 done
+if [[ "${status:-}" != "healthy" ]]; then
+  warn "API 未在预期时间内就绪，日志："
+  docker compose logs --tail=40 api
+  exit 1
+fi
 for i in {1..30}; do
   if curl -sf "http://localhost:${WEB_PORT}/api/config/public" >/dev/null 2>&1; then
     break
