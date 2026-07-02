@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import {
   DashboardOutlined,
   FileTextOutlined,
@@ -20,11 +21,18 @@ const menuRoutes = [
 export default function AdminLayout() {
   const navigate = useNavigate()
   const location = useLocation()
-  const { data: user, isLoading } = useQuery({
+  const { data: user, isLoading, isError } = useQuery({
     queryKey: ['me'],
     queryFn: async () => (await api.get('/auth/me')).data,
     retry: false,
+    refetchOnWindowFocus: false,
   })
+
+  useEffect(() => {
+    if (!isLoading && (isError || !user)) {
+      navigate('/login', { replace: true })
+    }
+  }, [isLoading, isError, user, navigate])
 
   if (isLoading) {
     return (
@@ -34,8 +42,7 @@ export default function AdminLayout() {
     )
   }
 
-  if (!user) {
-    navigate('/login', { replace: true })
+  if (isError || !user) {
     return null
   }
 

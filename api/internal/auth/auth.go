@@ -105,8 +105,9 @@ func (s *Service) login(c *gin.Context) {
 }
 
 func (s *Service) logout(c *gin.Context) {
-	c.SetCookie(refreshCookieName, "", -1, "/", "", false, true)
-	c.SetCookie(accessCookieName, "", -1, "/", "", false, true)
+	secure := cookieSecure(c)
+	c.SetCookie(refreshCookieName, "", -1, "/", "", secure, true)
+	c.SetCookie(accessCookieName, "", -1, "/", "", secure, true)
 	c.JSON(http.StatusOK, gin.H{"ok": true})
 }
 
@@ -200,9 +201,16 @@ func extractBearer(c *gin.Context) string {
 }
 
 func setTokenCookies(c *gin.Context, access, refresh string, accessTTL, refreshTTL time.Duration) {
-	secure := c.Request.TLS != nil
+	secure := cookieSecure(c)
 	c.SetCookie(accessCookieName, access, int(accessTTL.Seconds()), "/", "", secure, true)
 	c.SetCookie(refreshCookieName, refresh, int(refreshTTL.Seconds()), "/", "", secure, true)
+}
+
+func cookieSecure(c *gin.Context) bool {
+	if c.Request.TLS != nil {
+		return true
+	}
+	return strings.EqualFold(c.GetHeader("X-Forwarded-Proto"), "https")
 }
 
 func UserID(c *gin.Context) string {
