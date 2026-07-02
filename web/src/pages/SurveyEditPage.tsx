@@ -132,10 +132,14 @@ export default function SurveyEditPage() {
   })
 
   const previewSrcDoc = useMemo(
-    () => `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-      body{font-family:-apple-system,"PingFang SC",sans-serif;padding:24px;color:#1f2329}
-      input,textarea,select{width:100%;min-height:40px;border:1px solid #d9dde4;border-radius:6px;padding:8px 12px;margin-bottom:16px}
-      label{display:block;margin-bottom:8px;font-weight:500}
+    () => `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>
+      *{box-sizing:border-box}
+      body{font-family:-apple-system,"PingFang SC",sans-serif;padding:24px;color:#1f2329;margin:0;word-break:break-word}
+      input,textarea,select{width:100%;max-width:100%;min-height:44px;border:1px solid #d9dde4;border-radius:6px;padding:8px 12px;margin-bottom:16px;font-size:16px}
+      textarea{min-height:96px;resize:vertical}
+      label{display:block;margin-bottom:8px;font-weight:500;line-height:1.5}
+      img,video{max-width:100%;height:auto}
+      @media (max-width:480px){body{padding:16px}}
     </style></head><body class="survey-skin">${html || defaultHTML(fields)}</body></html>`,
     [html, fields],
   )

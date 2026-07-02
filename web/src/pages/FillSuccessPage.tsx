@@ -9,7 +9,7 @@ export default function FillSuccessPage() {
   })
 
   return (
-    <div className="public-card">
+    <div className="public-card fill-page__result">
       <Result
         status="success"
         title="提交成功"
