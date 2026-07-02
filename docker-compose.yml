@@ -27,6 +27,7 @@ services:
     env_file:
       - .env
     environment:
+      # 固定指向 compose 内 postgres；勿用 .env 的 localhost DATABASE_URL
       DATABASE_URL: postgres://${POSTGRES_USER:-surveybox}:${POSTGRES_PASSWORD:-surveybox}@postgres:5432/${POSTGRES_DB:-surveybox}?sslmode=disable
       API_ADDR: :8080
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost}
@@ -39,10 +40,10 @@ services:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/health"]
-      interval: 30s
+      interval: 10s
       timeout: 5s
-      retries: 3
-      start_period: 15s
+      retries: 12
+      start_period: 45s
     networks:
       - surveybox
     restart: unless-stopped

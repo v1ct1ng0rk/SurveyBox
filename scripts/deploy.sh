@@ -45,16 +45,48 @@ POSTGRES_DATA_DIR="${POSTGRES_DATA_DIR:-/data/workspace/db/pg/SurveyBox}"
 export POSTGRES_DATA_DIR
 if [[ ! -d "$POSTGRES_DATA_DIR" ]]; then
   info "创建 PostgreSQL 数据目录: $POSTGRES_DATA_DIR"
-  mkdir -p "$POSTGRES_DATA_DIR"
+  if ! mkdir -p "$POSTGRES_DATA_DIR" 2>/dev/null; then
+    warn "需要 sudo 创建数据目录"
+    sudo mkdir -p "$POSTGRES_DATA_DIR"
+  fi
+fi
+# 空目录时确保 postgres 容器（uid 70）可写
+if [[ ! -f "$POSTGRES_DATA_DIR/PG_VERSION" ]] && command -v chown >/dev/null 2>&1; then
+  if chown 70:70 "$POSTGRES_DATA_DIR" 2>/dev/null; then
+    :
+  elif sudo chown 70:70 "$POSTGRES_DATA_DIR" 2>/dev/null; then
+    :
+  fi
 fi
 
 info "构建镜像..."
 docker compose build
 
 info "启动服务..."
-docker compose up -d
+if ! docker compose up -d; then
+  warn "启动失败，最近日志："
+  docker compose logs --tail=60 postgres api 2>/dev/null || true
+  echo ""
+  warn "常见原因："
+  warn "  1. POSTGRES_PASSWORD 与已有数据库数据不一致 → 改回旧密码或清空 ${POSTGRES_DATA_DIR}"
+  warn "  2. postgres 未就绪 → 执行: docker compose logs postgres"
+  warn "  3. api 连库失败 → 执行: docker compose logs api"
+  exit 1
+fi
 
-info "等待服务就绪..."
+info "等待 API 健康检查..."
+for i in {1..60}; do
+  status="$(docker inspect surveybox-api --format '{{.State.Health.Status}}' 2>/dev/null || echo unknown)"
+  if [[ "$status" == "healthy" ]]; then
+    break
+  fi
+  if docker inspect surveybox-api --format '{{.State.Status}}' 2>/dev/null | grep -q exited; then
+    warn "API 容器已退出，日志："
+    docker compose logs --tail=40 api
+    exit 1
+  fi
+  sleep 2
+done
 for i in {1..30}; do
   if curl -sf "http://localhost:${WEB_PORT}/api/config/public" >/dev/null 2>&1; then
     break
