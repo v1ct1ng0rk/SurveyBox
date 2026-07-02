@@ -73,23 +73,19 @@ func (s *Service) getSurvey(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效或已过期"})
 		return
 	}
-	var title, desc, successMsg, status string
+	var title, desc, successMsg string
 	var allowMultiple bool
 	var schemaRaw json.RawMessage
 	var html string
 	err = s.pool.QueryRow(c, `
-		SELECT s.title, s.description, s.success_message, s.status::text, s.allow_multiple_submit,
+		SELECT s.title, s.description, s.success_message, s.allow_multiple_submit,
 		       sv.schema, sv.html_template
 		FROM surveys s
 		JOIN survey_versions sv ON sv.id = s.current_version_id
-		WHERE s.id = $1 AND s.status IN ('published', 'paused')
-	`, sc.SurveyID).Scan(&title, &desc, &successMsg, &status, &allowMultiple, &schemaRaw, &html)
+		WHERE s.id = $1 AND s.status = 'published'
+	`, sc.SurveyID).Scan(&title, &desc, &successMsg, &allowMultiple, &schemaRaw, &html)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效或已过期"})
-		return
-	}
-	if status == "paused" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "问卷已停止收集"})
 		return
 	}
 
@@ -201,6 +197,12 @@ func (s *Service) submitResponse(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true, "response_id": responseID})
 }
 
+func (s *Service) surveyPublished(c *gin.Context, surveyID string) bool {
+	var status string
+	err := s.pool.QueryRow(c, `SELECT status::text FROM surveys WHERE id=$1`, surveyID).Scan(&status)
+	return err == nil && status == "published"
+}
+
 func (s *Service) validFileIDs(c *gin.Context, shareID string) map[string]bool {
 	rows, _ := s.pool.Query(c, `SELECT id::text FROM files WHERE share_id=$1 AND status IN ('uploaded','bound')`, shareID)
 	defer rows.Close()
@@ -217,6 +219,10 @@ func (s *Service) uploadFile(c *gin.Context) {
 	sc, err := s.resolveShare(c)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效"})
+		return
+	}
+	if !s.surveyPublished(c, sc.SurveyID) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "问卷已结束"})
 		return
 	}
 	fieldID := c.PostForm("field_id")

@@ -55,6 +55,7 @@ func (s *Service) RegisterRoutes(r *gin.RouterGroup, authSvc *auth.Service) {
 	g.GET("/:id", s.get)
 	g.PUT("/:id", s.update)
 	g.POST("/:id/publish", s.publish)
+	g.POST("/:id/close", s.close)
 	g.POST("/:id/generate", middleware.RateLimit(10, time.Hour, func(c *gin.Context) string {
 		return "llm:" + auth.UserID(c)
 	}), s.generate)
@@ -263,6 +264,24 @@ func (s *Service) publish(c *gin.Context) {
 	_, err = s.pool.Exec(c, `UPDATE surveys SET status='published', updated_at=NOW() WHERE id=$1 AND created_by=$2`, id, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "发布失败"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"ok": true})
+}
+
+func (s *Service) close(c *gin.Context) {
+	id := c.Param("id")
+	userID := auth.UserID(c)
+	tag, err := s.pool.Exec(c, `
+		UPDATE surveys SET status='paused', updated_at=NOW()
+		WHERE id=$1 AND created_by=$2 AND status='published'
+	`, id, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "结束失败"})
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "仅进行中的问卷可结束"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})

@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, type ReactNode } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   Button,
@@ -18,7 +18,7 @@ import { InboxOutlined } from '@ant-design/icons'
 import axios from 'axios'
 import { useQuery, useMutation } from '@tanstack/react-query'
 
-const { Title, Paragraph } = Typography
+const { Title, Paragraph, Text } = Typography
 const { Dragger } = Upload
 
 type Field = {
@@ -32,6 +32,10 @@ type Field = {
 function fieldRules(f: Field) {
   if (!f.required || f.type === 'section') return []
   return [{ required: true, message: `请填写${f.label}` }]
+}
+
+function getErrorMessage(err: unknown) {
+  return (err as { response?: { data?: { error?: string } } })?.response?.data?.error
 }
 
 export default function FillPage() {
@@ -66,8 +70,7 @@ export default function FillPage() {
     },
     onSuccess: () => navigate(`/f/${token}/success`),
     onError: (err: unknown) => {
-      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
-      message.error(msg || '提交失败')
+      message.error(getErrorMessage(err) || '提交失败')
     },
   })
 
@@ -92,9 +95,14 @@ export default function FillPage() {
   }
 
   if (error || !survey) {
+    const ended = getErrorMessage(error)?.includes('结束')
     return (
       <div className="public-card fill-page__result">
-        <Result status="404" title="链接已失效" subTitle="请确认链接是否正确或联系分享人" />
+        <Result
+          status={ended ? 'info' : '404'}
+          title={ended ? '问卷已结束' : '链接已失效'}
+          subTitle={ended ? '该问卷已停止收集，如有疑问请联系分享人' : '请确认链接是否正确或联系分享人'}
+        />
       </div>
     )
   }
@@ -116,107 +124,103 @@ export default function FillPage() {
   const renderField = (f: Field) => {
     if (f.type === 'section') {
       return (
-        <Title key={f.id} level={4} className="fill-page__section">
-          {f.label}
-        </Title>
+        <div key={f.id} className="fill-page__field fill-page__field--section">
+          <Title level={4} className="fill-page__section">
+            {f.label}
+          </Title>
+        </div>
       )
     }
 
-    if (f.type === 'file') {
-      return (
-        <Form.Item key={f.id} name={f.id} label={f.label} rules={fieldRules(f)}>
-          <Dragger
-            className="fill-page__upload"
-            maxCount={1}
-            beforeUpload={(file) => {
-              uploadFile(f.id, file)
-              return false
-            }}
-          >
-            <p className="ant-upload-drag-icon">
-              <InboxOutlined />
-            </p>
-            <p className="ant-upload-text">点击或拖拽上传</p>
-            {fileMap[f.id] && <p className="ant-upload-hint">{fileMap[f.id].filename}</p>}
-          </Dragger>
+    const item = (children: ReactNode) => (
+      <div key={f.id} className="fill-page__field">
+        <Form.Item name={f.id} label={f.label} rules={fieldRules(f)} className="fill-page__form-item">
+          {children}
         </Form.Item>
+      </div>
+    )
+
+    if (f.type === 'file') {
+      return item(
+        <Dragger
+          className="fill-page__upload"
+          maxCount={1}
+          beforeUpload={(file) => {
+            uploadFile(f.id, file)
+            return false
+          }}
+        >
+          <p className="ant-upload-drag-icon">
+            <InboxOutlined />
+          </p>
+          <p className="ant-upload-text">点击或拖拽上传</p>
+          {fileMap[f.id] && <p className="ant-upload-hint">{fileMap[f.id].filename}</p>}
+        </Dragger>,
       )
     }
 
     if (f.type === 'textarea') {
-      return (
-        <Form.Item key={f.id} name={f.id} label={f.label} rules={fieldRules(f)}>
-          <Input.TextArea rows={4} placeholder={`请输入${f.label}`} />
-        </Form.Item>
-      )
+      return item(<Input.TextArea rows={4} placeholder={`请输入${f.label}`} />)
     }
 
     if (f.type === 'number') {
-      return (
-        <Form.Item key={f.id} name={f.id} label={f.label} rules={fieldRules(f)}>
-          <InputNumber style={{ width: '100%' }} placeholder={`请输入${f.label}`} inputMode="decimal" />
-        </Form.Item>
-      )
+      return item(<InputNumber style={{ width: '100%' }} placeholder={`请输入${f.label}`} inputMode="decimal" />)
     }
 
     if (f.type === 'select') {
-      return (
-        <Form.Item key={f.id} name={f.id} label={f.label} rules={fieldRules(f)}>
-          <Select
-            placeholder={`请选择${f.label}`}
-            options={(f.options || []).map((o) => ({ label: o, value: o }))}
-          />
-        </Form.Item>
+      return item(
+        <Select
+          placeholder={`请选择${f.label}`}
+          options={(f.options || []).map((o) => ({ label: o, value: o }))}
+        />,
       )
     }
 
     if (f.type === 'radio') {
-      return (
-        <Form.Item key={f.id} name={f.id} label={f.label} rules={fieldRules(f)}>
-          <Radio.Group
-            options={(f.options || []).map((o) => ({ label: o, value: o }))}
-          />
-        </Form.Item>
+      return item(
+        <Radio.Group options={(f.options || []).map((o) => ({ label: o, value: o }))} />,
       )
     }
 
     if (f.type === 'checkbox') {
-      return (
-        <Form.Item key={f.id} name={f.id} label={f.label} rules={fieldRules(f)}>
-          <Checkbox.Group options={f.options || []} />
-        </Form.Item>
-      )
+      return item(<Checkbox.Group options={f.options || []} />)
     }
 
-    return (
-      <Form.Item key={f.id} name={f.id} label={f.label} rules={fieldRules(f)}>
-        <Input placeholder={`请输入${f.label}`} />
-      </Form.Item>
-    )
+    return item(<Input placeholder={`请输入${f.label}`} />)
   }
 
   return (
     <div className="public-card survey-skin fill-page">
-      <Title level={2} className="fill-page__title">
-        {survey.title}
-      </Title>
-      {survey.description && (
-        <Paragraph type="secondary" className="fill-page__desc">
-          {survey.description}
-        </Paragraph>
-      )}
+      <div className="fill-page__hero">
+        <Text className="fill-page__badge">在线问卷</Text>
+        <Title level={2} className="fill-page__title">
+          {survey.title}
+        </Title>
+        {survey.description && (
+          <Paragraph className="fill-page__desc">
+            {survey.description}
+          </Paragraph>
+        )}
+      </div>
 
       <Form
         form={form}
         layout="vertical"
         className="fill-page__form"
-        requiredMark={false}
+        requiredMark={(label, { required }) => (
+          required ? (
+            <>
+              {label}
+              <span className="fill-page__required">*</span>
+            </>
+          ) : label
+        )}
         onFinish={(values) => submitMutation.mutate(values)}
       >
         {fields.map(renderField)}
         <Form.Item className="fill-page__submit">
           <Button type="primary" htmlType="submit" size="large" block loading={submitMutation.isPending}>
-            提交
+            提交问卷
           </Button>
         </Form.Item>
       </Form>

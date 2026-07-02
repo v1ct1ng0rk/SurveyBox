@@ -1,5 +1,5 @@
-import { Button, Tag, message } from 'antd'
-import { PlusOutlined } from '@ant-design/icons'
+import { Button, Modal, Tag, message } from 'antd'
+import { ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { ProTable } from '@ant-design/pro-components'
 import type { ProColumns } from '@ant-design/pro-components'
@@ -19,8 +19,8 @@ type SurveyItem = {
 
 const statusMap: Record<string, { color: string; text: string }> = {
   draft: { color: 'default', text: '草稿' },
-  published: { color: 'success', text: '已发布' },
-  paused: { color: 'warning', text: '已暂停' },
+  published: { color: 'success', text: '进行中' },
+  paused: { color: 'warning', text: '已结束' },
   archived: { color: 'default', text: '已归档' },
 }
 
@@ -41,6 +41,30 @@ export default function SurveysPage() {
       navigate(`/surveys/${data.id}/edit`)
     },
   })
+
+  const closeMutation = useMutation({
+    mutationFn: async (surveyId: string) => api.post(`/surveys/${surveyId}/close`),
+    onSuccess: () => {
+      message.success('问卷已结束，分享链接将无法打开')
+      queryClient.invalidateQueries({ queryKey: ['surveys'] })
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      message.error(msg || '操作失败')
+    },
+  })
+
+  const confirmClose = (item: SurveyItem) => {
+    Modal.confirm({
+      title: '结束问卷',
+      icon: <ExclamationCircleOutlined />,
+      content: `确定结束「${item.title}」吗？结束后将不再接收新的回答，已发出的分享链接将无法打开。`,
+      okText: '结束',
+      okType: 'danger',
+      cancelText: '取消',
+      onOk: () => closeMutation.mutateAsync(item.id),
+    })
+  }
 
   const columns: ProColumns<SurveyItem>[] = [
     { title: '标题', dataIndex: 'title', ellipsis: true },
@@ -63,10 +87,15 @@ export default function SurveysPage() {
     {
       title: '操作',
       valueType: 'option',
-      width: 200,
+      width: 220,
       render: (_, r) => [
         <a key="edit" onClick={() => navigate(`/surveys/${r.id}/edit`)}>编辑</a>,
-        r.status === 'published' && <a key="detail" onClick={() => navigate(`/surveys/${r.id}`)}>详情</a>,
+        r.status === 'published' && (
+          <a key="close" onClick={() => confirmClose(r)}>结束</a>
+        ),
+        (r.status === 'published' || r.status === 'paused') && (
+          <a key="detail" onClick={() => navigate(`/surveys/${r.id}`)}>详情</a>
+        ),
       ],
     },
   ]
