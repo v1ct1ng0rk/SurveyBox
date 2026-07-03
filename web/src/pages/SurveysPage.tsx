@@ -1,4 +1,4 @@
-import { Button, Modal, Popconfirm, Tag, message } from 'antd'
+import { Button, Modal, Tag, message } from 'antd'
 import { ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { ProTable } from '@ant-design/pro-components'
@@ -75,7 +75,21 @@ export default function SurveysPage() {
       okText: t('common.close'),
       okType: 'danger',
       cancelText: t('common.cancel'),
+      centered: true,
       onOk: () => closeMutation.mutateAsync(item.id),
+    })
+  }
+
+  const confirmDelete = (item: SurveyItem) => {
+    Modal.confirm({
+      title: t('common.delete'),
+      icon: <ExclamationCircleOutlined />,
+      content: t('surveys.confirmDelete', { title: item.title }),
+      okText: t('common.delete'),
+      okType: 'danger',
+      cancelText: t('common.cancel'),
+      centered: true,
+      onOk: () => deleteMutation.mutateAsync(item.id),
     })
   }
 
@@ -106,12 +120,7 @@ export default function SurveysPage() {
         <div className="admin-table-actions">
           <ActionLink onClick={() => navigate(`/surveys/${r.id}/edit`)}>{t('common.edit')}</ActionLink>
           {r.status === 'draft' && (
-            <Popconfirm
-              title={t('surveys.confirmDelete', { title: r.title })}
-              onConfirm={() => deleteMutation.mutate(r.id)}
-            >
-              <ActionLink danger>{t('common.delete')}</ActionLink>
-            </Popconfirm>
+            <ActionLink danger onClick={() => confirmDelete(r)}>{t('common.delete')}</ActionLink>
           )}
           {r.status === 'published' && (
             <ActionLink danger onClick={() => confirmClose(r)}>{t('common.close')}</ActionLink>
