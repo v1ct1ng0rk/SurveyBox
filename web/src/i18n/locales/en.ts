@@ -88,6 +88,9 @@ export default {
     closeContent: 'End "{{title}}"? No new responses will be accepted and existing share links will stop working.',
     closeSuccess: 'Survey ended. Share links are no longer available.',
     operationFailed: 'Operation failed',
+    confirmDelete: 'Delete draft "{{title}}"? This cannot be undone.',
+    deleted: 'Draft deleted',
+    deleteFailed: 'Delete failed',
   },
   surveyEdit: {
     untitled: 'Untitled survey',
@@ -203,6 +206,8 @@ export default {
     validationFailed: 'Please complete all required fields',
     uploadSuccess: 'Uploaded successfully',
     uploadText: 'Click or drag to upload',
+    uploadMultiHint: 'Multiple files allowed, up to {{count}}',
+    uploadLimit: 'You can upload at most {{count}} files',
     linkInvalid: 'Link expired',
     linkInvalidDesc: 'Please check the link or contact the sender',
     surveyEnded: 'Survey ended',

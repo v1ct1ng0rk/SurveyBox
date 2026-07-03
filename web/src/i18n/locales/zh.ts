@@ -88,6 +88,9 @@ export default {
     closeContent: '确定结束「{{title}}」吗？结束后将不再接收新的回答，已发出的分享链接将无法打开。',
     closeSuccess: '问卷已结束，分享链接将无法打开',
     operationFailed: '操作失败',
+    confirmDelete: '确定删除草稿「{{title}}」吗？此操作不可恢复。',
+    deleted: '草稿已删除',
+    deleteFailed: '删除失败',
   },
   surveyEdit: {
     untitled: '未命名问卷',
@@ -203,6 +206,8 @@ export default {
     validationFailed: '请检查并填写所有必填项',
     uploadSuccess: '上传成功',
     uploadText: '点击或拖拽上传',
+    uploadMultiHint: '可上传多个文件，最多 {{count}} 个',
+    uploadLimit: '最多上传 {{count}} 个文件',
     linkInvalid: '链接已失效',
     linkInvalidDesc: '请确认链接是否正确或联系分享人',
     surveyEnded: '问卷已结束',

@@ -15,6 +15,7 @@ import {
   Typography,
 } from 'antd'
 import { InboxOutlined } from '@ant-design/icons'
+import type { UploadFile } from 'antd/es/upload/interface'
 import axios, { type AxiosError } from 'axios'
 import { useQuery, useMutation } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
@@ -23,6 +24,7 @@ import { useFillSurveyLocale } from '../i18n/useFillSurveyLocale'
 
 const { Title, Paragraph, Text } = Typography
 const { Dragger } = Upload
+const MAX_FILES_PER_FIELD = 10
 
 type Field = {
   id: string
@@ -30,6 +32,11 @@ type Field = {
   label: string
   required?: boolean
   options?: string[]
+}
+
+type UploadedFile = {
+  file_id: string
+  filename: string
 }
 
 function getErrorMessage(err: unknown) {
@@ -43,6 +50,10 @@ function isEmptyValue(value: unknown) {
   return false
 }
 
+function fileIdsFromItems(items: UploadedFile[]) {
+  return items.map((f) => f.file_id)
+}
+
 export default function FillPage() {
   const { token } = useParams<{ token: string }>()
   const navigate = useNavigate()
@@ -50,7 +61,7 @@ export default function FillPage() {
   const { t } = useTranslation()
   const apiError = useApiError()
   const { message } = App.useApp()
-  const [fileMap, setFileMap] = useState<Record<string, { file_id: string; filename: string }>>({})
+  const [fileMap, setFileMap] = useState<Record<string, UploadedFile[]>>({})
 
   const publicApi = useMemo(
     () =>
@@ -72,11 +83,18 @@ export default function FillPage() {
 
   useFillSurveyLocale(survey?.display_locale)
 
+  const syncFieldFiles = (fieldId: string, items: UploadedFile[]) => {
+    setFileMap((m) => ({ ...m, [fieldId]: items }))
+    form.setFieldValue(fieldId, fileIdsFromItems(items))
+  }
+
   const submitMutation = useMutation({
     mutationFn: async (values: Record<string, unknown>) => {
       const payload: Record<string, unknown> = { ...values }
-      Object.entries(fileMap).forEach(([fieldId, f]) => {
-        payload[fieldId] = f.file_id
+      Object.entries(fileMap).forEach(([fieldId, items]) => {
+        if (items.length > 0) {
+          payload[fieldId] = fileIdsFromItems(items)
+        }
       })
       return publicApi.post('/responses', { answers: payload })
     },
@@ -98,6 +116,11 @@ export default function FillPage() {
   })
 
   const uploadFile = async (fieldId: string, file: File) => {
+    const current = fileMap[fieldId] ?? []
+    if (current.length >= MAX_FILES_PER_FIELD) {
+      message.warning(t('fill.uploadLimit', { count: MAX_FILES_PER_FIELD }))
+      return
+    }
     const formData = new FormData()
     formData.append('file', file)
     formData.append('field_id', fieldId)
@@ -105,9 +128,17 @@ export default function FillPage() {
       const { data } = await publicApi.post('/files', formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
       })
-      setFileMap((m) => ({ ...m, [fieldId]: { file_id: data.file_id, filename: data.filename } }))
-      form.setFieldValue(fieldId, data.file_id)
+      syncFieldFiles(fieldId, [...current, { file_id: data.file_id, filename: data.filename }])
       message.success(t('fill.uploadSuccess'))
+    } catch (err: unknown) {
+      message.error(apiError(getErrorMessage(err), 'fill.submitFailed'))
+    }
+  }
+
+  const removeFile = async (fieldId: string, fileId: string) => {
+    try {
+      await publicApi.delete(`/files/${fileId}`)
+      syncFieldFiles(fieldId, (fileMap[fieldId] ?? []).filter((f) => f.file_id !== fileId))
     } catch (err: unknown) {
       message.error(apiError(getErrorMessage(err), 'fill.submitFailed'))
     }
@@ -118,7 +149,7 @@ export default function FillPage() {
     return [{
       validator: (_: unknown, value: unknown) => {
         const filled = f.type === 'file'
-          ? !isEmptyValue(value) || !!fileMap[f.id]
+          ? (fileMap[f.id]?.length ?? 0) > 0 || !isEmptyValue(value)
           : !isEmptyValue(value)
         return filled
           ? Promise.resolve()
@@ -184,12 +215,24 @@ export default function FillPage() {
     )
 
     if (f.type === 'file') {
+      const uploaded = fileMap[f.id] ?? []
+      const fileList: UploadFile[] = uploaded.map((f) => ({
+        uid: f.file_id,
+        name: f.filename,
+        status: 'done',
+      }))
       return item(
         <Dragger
           className="fill-page__upload"
-          maxCount={1}
+          multiple
+          maxCount={MAX_FILES_PER_FIELD}
+          fileList={fileList}
           beforeUpload={(file) => {
             void uploadFile(f.id, file)
+            return false
+          }}
+          onRemove={(file) => {
+            void removeFile(f.id, file.uid)
             return false
           }}
         >
@@ -197,7 +240,7 @@ export default function FillPage() {
             <InboxOutlined />
           </p>
           <p className="ant-upload-text">{t('fill.uploadText')}</p>
-          {fileMap[f.id] && <p className="ant-upload-hint">{fileMap[f.id].filename}</p>}
+          <p className="ant-upload-hint">{t('fill.uploadMultiHint', { count: MAX_FILES_PER_FIELD })}</p>
         </Dragger>,
       )
     }

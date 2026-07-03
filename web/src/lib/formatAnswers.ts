@@ -36,12 +36,13 @@ export function formatAnswerValue(
   }
 
   if (field.type === 'file') {
-    const fileId = String(value)
-    const meta = files?.[field.id] ?? (files?.[fileId] ? files[fileId] : undefined)
-    if (meta?.filename) {
-      return { text: meta.filename, fileMeta: meta }
-    }
-    return { text: t('surveyDetail.fileAttached') }
+    const ids = Array.isArray(value) ? value.map(String) : [String(value)]
+    const names = ids.map((fileId) => {
+      const meta = (files?.[fileId] as AnswerFileMeta | undefined)
+        ?? (files?.[field.id] as AnswerFileMeta | undefined)
+      return meta?.filename ?? t('surveyDetail.fileAttached')
+    })
+    return { text: names.join(', ') }
   }
 
   if (field.type === 'section') {

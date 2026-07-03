@@ -37,11 +37,30 @@ func ValidateAnswers(doc *Document, answers map[string]interface{}, fileIDs map[
 			return fmt.Errorf("字段 %s 为必填", f.Label)
 		}
 		if f.Type == "file" && ok && val != nil {
-			fid, _ := val.(string)
-			if fid != "" && !fileIDs[fid] {
-				return fmt.Errorf("文件 %s 无效", f.Label)
+			for _, fid := range FileIDsFromAnswer(val) {
+				if !fileIDs[fid] {
+					return fmt.Errorf("文件 %s 无效", f.Label)
+				}
 			}
 		}
+	}
+	return nil
+}
+
+func FileIDsFromAnswer(v interface{}) []string {
+	switch t := v.(type) {
+	case string:
+		if strings.TrimSpace(t) != "" {
+			return []string{t}
+		}
+	case []interface{}:
+		var ids []string
+		for _, item := range t {
+			if s, ok := item.(string); ok && strings.TrimSpace(s) != "" {
+				ids = append(ids, s)
+			}
+		}
+		return ids
 	}
 	return nil
 }

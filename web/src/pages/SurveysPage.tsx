@@ -1,4 +1,4 @@
-import { Button, Modal, Tag, message } from 'antd'
+import { Button, Modal, Popconfirm, Tag, message } from 'antd'
 import { ExclamationCircleOutlined, PlusOutlined } from '@ant-design/icons'
 import { useNavigate } from 'react-router-dom'
 import { ProTable } from '@ant-design/pro-components'
@@ -54,6 +54,19 @@ export default function SurveysPage() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: async (surveyId: string) => api.delete(`/surveys/${surveyId}`),
+    onSuccess: () => {
+      message.success(t('surveys.deleted'))
+      queryClient.invalidateQueries({ queryKey: ['surveys'] })
+      queryClient.invalidateQueries({ queryKey: ['dashboard-summary'] })
+    },
+    onError: (err: unknown) => {
+      const msg = (err as { response?: { data?: { error?: string } } })?.response?.data?.error
+      message.error(apiError(msg, 'surveys.deleteFailed'))
+    },
+  })
+
   const confirmClose = (item: SurveyItem) => {
     Modal.confirm({
       title: t('surveys.closeTitle'),
@@ -88,10 +101,18 @@ export default function SurveysPage() {
     {
       title: t('common.actions'),
       valueType: 'option',
-      width: 240,
+      width: 280,
       render: (_, r) => (
         <div className="admin-table-actions">
           <ActionLink onClick={() => navigate(`/surveys/${r.id}/edit`)}>{t('common.edit')}</ActionLink>
+          {r.status === 'draft' && (
+            <Popconfirm
+              title={t('surveys.confirmDelete', { title: r.title })}
+              onConfirm={() => deleteMutation.mutate(r.id)}
+            >
+              <ActionLink danger>{t('common.delete')}</ActionLink>
+            </Popconfirm>
+          )}
           {r.status === 'published' && (
             <ActionLink danger onClick={() => confirmClose(r)}>{t('common.close')}</ActionLink>
           )}

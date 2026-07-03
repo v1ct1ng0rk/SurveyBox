@@ -196,11 +196,11 @@ func (s *Service) submitResponse(c *gin.Context) {
 		if f.Type != "file" {
 			continue
 		}
-		if v, ok := req.Answers[f.ID].(string); ok && v != "" {
+		for _, fid := range schema.FileIDsFromAnswer(req.Answers[f.ID]) {
 			_, _ = tx.Exec(c, `
 				UPDATE files SET status='bound', response_id=$1
 				WHERE id=$2 AND share_id=$3 AND status='uploaded'
-			`, responseID, v, sc.ShareID)
+			`, responseID, fid, sc.ShareID)
 		}
 	}
 

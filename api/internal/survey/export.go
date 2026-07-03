@@ -15,6 +15,7 @@ import (
 	"github.com/victorking528/SurveyBox/api/internal/auth"
 	exportcsv "github.com/victorking528/SurveyBox/api/pkg/exportcsv"
 	exportzip "github.com/victorking528/SurveyBox/api/pkg/exportzip"
+	"github.com/victorking528/SurveyBox/api/pkg/schema"
 )
 
 type exportResponseRow struct {
@@ -89,34 +90,40 @@ func (s *Service) exportResponses(c *gin.Context) {
 			Answers:     copyAnswers(r.Answers),
 		}
 		for _, fieldID := range fileFields {
-			fileID, _ := r.Answers[fieldID].(string)
-			if fileID == "" {
-				continue
+			var zipPaths []string
+			for fi, fileID := range schema.FileIDsFromAnswer(r.Answers[fieldID]) {
+				var storageKey, filename string
+				err := s.pool.QueryRow(c, `
+					SELECT f.storage_key, f.filename
+					FROM files f
+					JOIN responses r ON r.id = f.response_id
+					JOIN shares sh ON sh.id = r.share_id
+					WHERE f.id = $1 AND f.response_id = $2 AND sh.survey_id = $3 AND f.status = 'bound'
+				`, fileID, r.ResponseID, id).Scan(&storageKey, &filename)
+				if err != nil {
+					continue
+				}
+				label := fieldLabel(schemaDoc.Fields, fieldID)
+				if fi > 0 {
+					label = fmt.Sprintf("%s-%d", label, fi+1)
+				}
+				zipPath := attachmentZipPath(i+1, r.ContactName, label, filename)
+				zipPaths = append(zipPaths, zipPath)
+				storageKeyCopy := storageKey
+				pathCopy := zipPath
+				zipFiles = append(zipFiles, exportzip.FileEntry{
+					Path: pathCopy,
+					Open: func() (io.ReadCloser, error) {
+						if s.storage == nil {
+							return nil, fmt.Errorf("storage not configured")
+						}
+						return s.storage.Get(c.Request.Context(), storageKeyCopy)
+					},
+				})
 			}
-			var storageKey, filename string
-			err := s.pool.QueryRow(c, `
-				SELECT f.storage_key, f.filename
-				FROM files f
-				JOIN responses r ON r.id = f.response_id
-				JOIN shares sh ON sh.id = r.share_id
-				WHERE f.id = $1 AND f.response_id = $2 AND sh.survey_id = $3 AND f.status = 'bound'
-			`, fileID, r.ResponseID, id).Scan(&storageKey, &filename)
-			if err != nil {
-				continue
+			if len(zipPaths) > 0 {
+				csvRow.Answers[fieldID] = strings.Join(zipPaths, "; ")
 			}
-			zipPath := attachmentZipPath(i+1, r.ContactName, fieldLabel(schemaDoc.Fields, fieldID), filename)
-			csvRow.Answers[fieldID] = zipPath
-			storageKeyCopy := storageKey
-			pathCopy := zipPath
-			zipFiles = append(zipFiles, exportzip.FileEntry{
-				Path: pathCopy,
-				Open: func() (io.ReadCloser, error) {
-					if s.storage == nil {
-						return nil, fmt.Errorf("storage not configured")
-					}
-					return s.storage.Get(c.Request.Context(), storageKeyCopy)
-				},
-			})
 		}
 		csvRows = append(csvRows, csvRow)
 	}

@@ -398,7 +398,11 @@ func (s *Service) loadResponseFiles(c *gin.Context, responseID string) map[strin
 		if err := rows.Scan(&fieldID, &fileID, &filename); err != nil {
 			continue
 		}
-		files[fieldID] = map[string]string{"file_id": fileID, "filename": filename}
+		meta := map[string]string{"file_id": fileID, "filename": filename}
+		files[fileID] = meta
+		if _, exists := files[fieldID]; !exists {
+			files[fieldID] = meta
+		}
 	}
 	if len(files) == 0 {
 		return map[string]interface{}{}
