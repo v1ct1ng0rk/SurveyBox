@@ -8,6 +8,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { PageContainer } from '@ant-design/pro-components'
 import { useTranslation } from 'react-i18next'
 import api from '../lib/api'
+import { surveyCreateLocale } from '../lib/surveyDefaults'
 import { useApiError, useSurveyStatus } from '../i18n/hooks'
 import ActionLink from '../components/ActionLink'
 
@@ -24,7 +25,7 @@ type SurveyItem = {
 export default function SurveysPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const apiError = useApiError()
   const surveyStatus = useSurveyStatus()
   const { message } = App.useApp()
@@ -37,7 +38,7 @@ export default function SurveysPage() {
   })
 
   const createMutation = useMutation({
-    mutationFn: async () => (await api.post('/surveys')).data,
+    mutationFn: async () => (await api.post('/surveys', { locale: surveyCreateLocale(i18n.language) })).data,
     onSuccess: (data) => {
       message.success(t('surveys.created'))
       queryClient.invalidateQueries({ queryKey: ['surveys'] })

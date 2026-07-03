@@ -8,6 +8,7 @@ import { PageContainer } from '@ant-design/pro-components'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
 import api from '../lib/api'
+import { localizeSurveySuccessMessage, localizeSurveyTitle } from '../lib/surveyDefaults'
 import { buildPreviewDocument, defaultHTML, type SurveyField, type SurveyTemplateLabels } from '../lib/surveyTemplate'
 import { useApiError, useSurveyStatus } from '../i18n/hooks'
 import { normalizeSurveyLocale, type AppLocale } from '../i18n'
@@ -50,7 +51,7 @@ async function persistSurvey(
 ) {
   const payload = buildSurveyPayload(fields, title, description, html, labels, displayLocale, successMessage)
   if (id === 'new') {
-    const { data } = await api.post('/surveys')
+    const { data } = await api.post('/surveys', { locale: displayLocale })
     await api.put(`/surveys/${data.id}`, payload)
     return data.id as string
   }
@@ -113,15 +114,21 @@ export default function SurveyEditPage() {
   })
 
   useEffect(() => {
-    if (survey) {
-      setTitle(survey.title)
-      setDescription(survey.description)
-      setSuccessMessage(survey.success_message || '')
-      const schema = survey.schema || { fields: [] }
-      setFields(schema.fields || [])
-      setHtml(survey.html_template || '')
-    }
+    if (!survey) return
+    setTitle(localizeSurveyTitle(survey.title, surveyLocale, t))
+    setDescription(survey.description)
+    setSuccessMessage(localizeSurveySuccessMessage(survey.success_message || '', surveyLocale, t))
+    const schema = survey.schema || { fields: [] }
+    setFields(schema.fields || [])
+    setHtml(survey.html_template || '')
+    // Only re-sync from server when survey payload changes, not on UI locale switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [survey])
+
+  useEffect(() => {
+    setTitle((prev) => localizeSurveyTitle(prev, surveyLocale, t))
+    setSuccessMessage((prev) => localizeSurveySuccessMessage(prev, surveyLocale, t))
+  }, [surveyLocale, t])
 
   const syncHTML = (next: SurveyField[]) => setHtml(defaultHTML(next, templateLabels))
 
@@ -242,7 +249,7 @@ export default function SurveyEditPage() {
   return (
     <PageContainer
       header={{
-        title: title || t('surveyEdit.untitled'),
+        title: localizeSurveyTitle(title, surveyLocale, t) || t('surveyEdit.untitled'),
         tags: [<Tag key="s" color={statusTag.color}>{statusTag.text}</Tag>],
         extra: (
           <Space>

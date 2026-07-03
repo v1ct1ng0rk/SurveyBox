@@ -122,6 +122,20 @@ func (s *Service) create(c *gin.Context) {
 	versionID := uuid.New()
 	defaultSchema := json.RawMessage(`{"version":1,"fields":[]}`)
 
+	var req struct {
+		Locale string `json:"locale"`
+	}
+	_ = c.ShouldBindJSON(&req)
+
+	title := "未命名问卷"
+	successMessage := "感谢您抽出宝贵时间参与本次调查，您的反馈将帮助我们不断提升服务质量。"
+	displayLocale := "zh"
+	if req.Locale == "en" {
+		title = "Untitled survey"
+		successMessage = "Thank you for taking the time to complete this survey. Your feedback helps us improve our service."
+		displayLocale = "en"
+	}
+
 	tx, err := s.pool.Begin(c)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建失败"})
@@ -130,9 +144,9 @@ func (s *Service) create(c *gin.Context) {
 	defer tx.Rollback(c)
 
 	_, err = tx.Exec(c, `
-		INSERT INTO surveys (id, title, created_by)
-		VALUES ($1, $2, $3)
-	`, surveyID, "未命名问卷", userID)
+		INSERT INTO surveys (id, title, success_message, display_locale, created_by)
+		VALUES ($1, $2, $3, $4, $5)
+	`, surveyID, title, successMessage, displayLocale, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建失败"})
 		return
