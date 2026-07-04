@@ -22,9 +22,11 @@ if ! git rev-parse --verify "${WOA_REMOTE}/${WOA_BRANCH}" >/dev/null 2>&1; then
   exit 1
 fi
 
-commits="$(git rev-list --reverse "${WOA_REMOTE}/${WOA_BRANCH}"..HEAD)"
-if [ -z "$commits" ]; then
-  echo "Nothing to push to ${WOA_REMOTE}."
+main_tree="$(git rev-parse HEAD^{tree})"
+woa_tree="$(git rev-parse "${WOA_REMOTE}/${WOA_BRANCH}^{tree}")"
+
+if [ "$main_tree" = "$woa_tree" ]; then
+  echo "Nothing to push to ${WOA_REMOTE} (trees match)."
   exit 0
 fi
 
@@ -34,16 +36,20 @@ trap 'git checkout -f "$current_branch" >/dev/null 2>&1; git branch -D "$tmp_bra
 git branch -f "$tmp_branch" "${WOA_REMOTE}/${WOA_BRANCH}"
 git checkout "$tmp_branch"
 
-for commit in $commits; do
-  git cherry-pick --no-commit "$commit" || true
-  if git diff --cached --quiet && git diff --quiet; then
-    echo "Skipping ${commit:0:7} (already on ${WOA_REMOTE}/${WOA_BRANCH})."
-    git reset --hard HEAD
-    continue
-  fi
-  git -c user.name="$WOA_NAME" -c user.email="$WOA_EMAIL" \
-    commit -C "$commit" --reset-author
-done
+git read-tree -u -m HEAD "$main_tree"
+
+if git diff --cached --quiet && git diff --quiet; then
+  echo "Nothing to push to ${WOA_REMOTE}."
+  exit 0
+fi
+
+commit_msg="$(git log --reverse --format=%B "${WOA_REMOTE}/${WOA_BRANCH}"..HEAD | sed '/^$/d' | head -c 10000)"
+if [ -z "$commit_msg" ]; then
+  commit_msg="$(git log -1 --format=%B HEAD)"
+fi
+
+git -c user.name="$WOA_NAME" -c user.email="$WOA_EMAIL" \
+  commit -m "$commit_msg"
 
 git push "$WOA_REMOTE" "${tmp_branch}:${WOA_BRANCH}"
 echo "Pushed to ${WOA_REMOTE}/${WOA_BRANCH} with ${WOA_EMAIL}."
