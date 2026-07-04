@@ -15,6 +15,7 @@ import { useApiError, useSurveyStatus } from '../i18n/hooks'
 import { normalizeSurveyLocale, type AppLocale } from '../i18n'
 import PublishSuccessModal from '../components/PublishSuccessModal'
 import SurveyFillPreview from '../components/SurveyFillPreview'
+import SortableFieldList from '../components/SortableFieldList'
 
 const { TextArea } = Input
 const { Text } = Typography
@@ -139,6 +140,11 @@ export default function SurveyEditPage() {
 
   const syncHTML = (next: SurveyField[]) => setHtml(defaultHTML(next, templateLabels))
 
+  const updateFields = (next: SurveyField[], syncHtml = true) => {
+    setFields(next)
+    if (syncHtml) syncHTML(next)
+  }
+
   const saveMutation = useMutation({
     mutationFn: async () => persistSurvey(
       id,
@@ -223,8 +229,7 @@ export default function SurveyEditPage() {
   const addField = () => {
     const fid = `field_${Date.now()}`
     const next = [...fields, { id: fid, type: 'text', label: t('surveyEdit.newQuestion'), required: false }]
-    setFields(next)
-    syncHTML(next)
+    updateFields(next)
   }
 
   if (isLoading && id !== 'new') return <Spin style={{ display: 'block', margin: '100px auto' }} />
@@ -347,59 +352,69 @@ export default function SurveyEditPage() {
             {fields.length === 0 ? (
               <Empty description={t('surveyEdit.emptyFields')} image={Empty.PRESENTED_IMAGE_SIMPLE} />
             ) : (
-              fields.map((f, idx) => (
-                <Card key={f.id} size="small" style={{ marginBottom: 8 }} styles={{ body: { padding: 12 } }}>
-                  <Select
-                    size="small"
-                    style={{ width: '100%', marginBottom: 8 }}
-                    value={f.type}
-                    options={fieldTypes}
-                    onChange={(v) => {
-                      const next = [...fields]
-                      next[idx] = { ...f, type: v }
-                      setFields(next)
-                      syncHTML(next)
-                    }}
-                  />
-                  <Input
-                    size="small"
-                    value={f.label}
-                    placeholder={t('surveyEdit.fieldTitle')}
-                    onChange={(e) => {
-                      const next = [...fields]
-                      next[idx] = { ...f, label: e.target.value }
-                      setFields(next)
-                    }}
-                    onBlur={() => syncHTML(fields)}
-                  />
-                  <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <span>
-                      <Text type="secondary" style={{ fontSize: 12 }}>{t('surveyEdit.required')} </Text>
-                      <Switch
+              <>
+                <Text type="secondary" style={{ display: 'block', marginBottom: 12, fontSize: 12 }}>
+                  {t('surveyEdit.dragToReorder')}
+                </Text>
+                <SortableFieldList
+                  fields={fields}
+                  onReorder={(next) => updateFields(next)}
+                  renderItem={(f, idx) => (
+                    <>
+                      <Select
                         size="small"
-                        checked={!!f.required}
+                        style={{ width: '100%', marginBottom: 8 }}
+                        value={f.type}
+                        options={fieldTypes}
                         onChange={(v) => {
                           const next = [...fields]
-                          next[idx] = { ...f, required: v }
-                          setFields(next)
+                          next[idx] = { ...f, type: v }
+                          updateFields(next)
                         }}
                       />
-                    </span>
-                    <Button
-                      type="link"
-                      danger
-                      size="small"
-                      onClick={() => {
-                        const next = fields.filter((_, i) => i !== idx)
-                        setFields(next)
-                        syncHTML(next)
-                      }}
-                    >
-                      {t('common.delete')}
-                    </Button>
-                  </div>
-                </Card>
-              ))
+                      <Input
+                        size="small"
+                        value={f.label}
+                        placeholder={t('surveyEdit.fieldTitle')}
+                        onChange={(e) => {
+                          const next = [...fields]
+                          next[idx] = { ...f, label: e.target.value }
+                          updateFields(next, false)
+                        }}
+                        onBlur={(e) => {
+                          const next = [...fields]
+                          next[idx] = { ...f, label: e.target.value }
+                          syncHTML(next)
+                        }}
+                      />
+                      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span>
+                          <Text type="secondary" style={{ fontSize: 12 }}>{t('surveyEdit.required')} </Text>
+                          <Switch
+                            size="small"
+                            checked={!!f.required}
+                            onChange={(v) => {
+                              const next = [...fields]
+                              next[idx] = { ...f, required: v }
+                              updateFields(next)
+                            }}
+                          />
+                        </span>
+                        <Button
+                          type="link"
+                          danger
+                          size="small"
+                          onClick={() => {
+                            updateFields(fields.filter((_, i) => i !== idx))
+                          }}
+                        >
+                          {t('common.delete')}
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                />
+              </>
             )}
           </Card>
         </Col>

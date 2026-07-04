@@ -122,6 +122,8 @@ export default {
     fieldStructure: '字段结构',
     addField: '添加字段',
     emptyFields: '暂无字段，点击右上角添加',
+    dragToReorder: '拖动左侧手柄调整顺序',
+    dragHandleAria: '拖动以调整字段顺序',
     fieldTitle: '字段标题',
     required: '必填',
     newQuestion: '新问题',

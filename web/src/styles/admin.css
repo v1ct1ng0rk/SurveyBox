@@ -83,3 +83,40 @@
   display: flex;
   align-items: center;
 }
+
+.sortable-field-item__row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.sortable-field-item__handle {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  margin-top: 2px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #8c8c8c;
+  cursor: grab;
+  touch-action: none;
+}
+
+.sortable-field-item__handle:hover {
+  background: #f0f2f5;
+  color: #1677ff;
+}
+
+.sortable-field-item__handle:active {
+  cursor: grabbing;
+}
+
+.sortable-field-item__content {
+  flex: 1;
+  min-width: 0;
+}

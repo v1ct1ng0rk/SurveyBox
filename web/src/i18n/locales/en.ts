@@ -122,6 +122,8 @@ export default {
     fieldStructure: 'Field structure',
     addField: 'Add field',
     emptyFields: 'No fields yet. Click Add field above.',
+    dragToReorder: 'Drag the handle on the left to reorder fields',
+    dragHandleAria: 'Drag to reorder field',
     fieldTitle: 'Field label',
     required: 'Required',
     newQuestion: 'New question',
