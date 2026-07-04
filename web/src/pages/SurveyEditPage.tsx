@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import {
   Button, Card, Col, DatePicker, Empty, Form, Input, Modal, Result, Row, Select, Space, Tag, Typography, message, Switch, Spin,
 } from 'antd'
@@ -248,6 +248,10 @@ export default function SurveyEditPage() {
         />
       </PageContainer>
     )
+  }
+
+  if (survey && survey.status !== 'draft') {
+    return <Navigate to={`/surveys/${id}`} replace />
   }
 
   const isDraft = id === 'new' || !survey || survey.status === 'draft'

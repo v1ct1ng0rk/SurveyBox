@@ -209,8 +209,8 @@ func (s *Service) update(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "问卷不存在"})
 		return
 	}
-	if status != "draft" && (req.Schema != nil || req.HTMLTemplate != nil) {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "已发布问卷不可修改结构，请复制为新问卷"})
+	if status != "draft" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "仅草稿可编辑"})
 		return
 	}
 
@@ -307,9 +307,20 @@ func (s *Service) publish(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请至少添加一个字段后再发布"})
 		return
 	}
-	_, err = s.pool.Exec(c, `UPDATE surveys SET status='published', updated_at=NOW() WHERE id=$1 AND created_by=$2`, id, userID)
+	if sv.Status != "draft" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "仅草稿可发布"})
+		return
+	}
+	tag, err := s.pool.Exec(c, `
+		UPDATE surveys SET status='published', updated_at=NOW()
+		WHERE id=$1 AND created_by=$2 AND status='draft'
+	`, id, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "发布失败"})
+		return
+	}
+	if tag.RowsAffected() == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "仅草稿可发布"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": true})
@@ -352,6 +363,10 @@ func (s *Service) generate(c *gin.Context) {
 	sv, err := s.loadSurvey(c, id, userID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "问卷不存在"})
+		return
+	}
+	if sv.Status != "draft" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "仅草稿可编辑"})
 		return
 	}
 	locale := strings.TrimSpace(req.Locale)

@@ -109,7 +109,9 @@ export default function SurveysPage() {
       width: 280,
       render: (_, r) => (
         <div className="admin-table-actions" onClick={(e) => e.stopPropagation()}>
-          <ActionLink onClick={() => navigate(`/surveys/${r.id}/edit`)}>{t('common.edit')}</ActionLink>
+          {r.status === 'draft' && (
+            <ActionLink onClick={() => navigate(`/surveys/${r.id}/edit`)}>{t('common.edit')}</ActionLink>
+          )}
           {r.status === 'draft' && (
             <ActionLink danger onClick={() => setDeleteTarget(r)}>{t('common.delete')}</ActionLink>
           )}

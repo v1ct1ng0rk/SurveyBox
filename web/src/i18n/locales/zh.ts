@@ -176,6 +176,8 @@ export default {
     selectContacts: '选择要分享的联系人',
     expiresAt: '截止日期',
     noExpiry: '永不过期',
+    endedBannerTitle: '问卷已结束',
+    endedBannerDesc: '分享链接已停止收集，填写者将无法再提交。',
     generateLinks: '生成链接',
   },
   publishSuccess: {
@@ -260,6 +262,8 @@ export default {
     '仅进行中的问卷可结束': '仅进行中的问卷可结束',
     '请输入描述': '请输入描述',
     '描述过长': '描述过长',
+    '仅草稿可编辑': '仅草稿可编辑',
+    '仅草稿可发布': '仅草稿可发布',
     '仅草稿可删除': '仅草稿可删除',
     '链接无效或已过期': '链接无效或已过期',
     '链接无效': '链接无效',

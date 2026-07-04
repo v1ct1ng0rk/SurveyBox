@@ -101,7 +101,9 @@ export default function DashboardPage() {
                 <List.Item
                   actions={[
                     <div key="actions" className="admin-table-actions">
-                      <ActionLink onClick={() => navigate(`/surveys/${item.id}/edit`)}>{t('common.edit')}</ActionLink>
+                      {item.status === 'draft' && (
+                        <ActionLink onClick={() => navigate(`/surveys/${item.id}/edit`)}>{t('common.edit')}</ActionLink>
+                      )}
                       {item.status === 'published' && (
                         <ActionLink icon={<ShareAltOutlined />} onClick={() => navigate(`/surveys/${item.id}?share=1`)}>
                           {t('dashboard.share')}
@@ -114,7 +116,14 @@ export default function DashboardPage() {
                   ]}
                 >
                   <List.Item.Meta
-                    title={<a onClick={() => navigate(`/surveys/${item.id}/edit`)}>{item.title}</a>}
+                    title={(
+                      <a onClick={() => navigate(
+                        item.status === 'draft' ? `/surveys/${item.id}/edit` : `/surveys/${item.id}`,
+                      )}
+                      >
+                        {item.title}
+                      </a>
+                    )}
                     description={(
                       <span style={{ color: tokens.colorTextSecondary }}>
                         <Tag color={status.color} style={{ marginRight: 8 }}>{status.text}</Tag>

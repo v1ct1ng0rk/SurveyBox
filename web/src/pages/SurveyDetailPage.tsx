@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useParams, useSearchParams } from 'react-router-dom'
 import {
   Alert, Button, Descriptions, Space, Table, Tabs, Tag, Typography, message, Modal, Checkbox,
 } from 'antd'
@@ -41,7 +41,6 @@ function normalizeFiles(raw?: Record<string, unknown>): Record<string, AnswerFil
 
 export default function SurveyDetailPage() {
   const { id } = useParams<{ id: string }>()
-  const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
   const queryClient = useQueryClient()
   const { t } = useTranslation()
@@ -164,7 +163,6 @@ export default function SurveyDetailPage() {
         tags: statusTag ? [<Tag key="s" color={statusTag.color}>{statusTag.text}</Tag>] : [],
         extra: (
           <Space>
-            <Button onClick={() => navigate(`/surveys/${id}/edit`)}>{t('common.edit')}</Button>
             {survey?.status === 'published' && (
               <Button type="primary" onClick={() => { setShareResult([]); setShareOpen(true) }}>
                 {t('surveyDetail.batchShare')}
@@ -174,6 +172,16 @@ export default function SurveyDetailPage() {
         ),
       }}
     >
+      {survey?.status === 'paused' && (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginBottom: 16 }}
+          message={t('surveyDetail.endedBannerTitle')}
+          description={t('surveyDetail.endedBannerDesc')}
+        />
+      )}
+
       {showPublishGuide && (
         <Alert
           className="admin-guide-alert"

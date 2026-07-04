@@ -176,6 +176,8 @@ export default {
     selectContacts: 'Select contacts to share with',
     expiresAt: 'Expiry date',
     noExpiry: 'No expiry',
+    endedBannerTitle: 'Survey ended',
+    endedBannerDesc: 'Share links are no longer accepting responses.',
     generateLinks: 'Generate links',
   },
   publishSuccess: {
@@ -260,6 +262,8 @@ export default {
     '仅进行中的问卷可结束': 'Only active surveys can be ended',
     '请输入描述': 'Please enter a description',
     '描述过长': 'Description is too long',
+    '仅草稿可编辑': 'Only drafts can be edited',
+    '仅草稿可发布': 'Only drafts can be published',
     '仅草稿可删除': 'Only drafts can be deleted',
     '链接无效或已过期': 'Invalid or expired link',
     '链接无效': 'Invalid link',
