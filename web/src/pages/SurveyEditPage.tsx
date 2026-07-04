@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import {
-  Button, Card, Col, Empty, Form, Input, Modal, Result, Row, Select, Space, Tag, Typography, message, Switch, Spin,
+  Button, Card, Col, DatePicker, Empty, Form, Input, Modal, Result, Row, Select, Space, Tag, Typography, message, Switch, Spin,
 } from 'antd'
 import { EyeOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import { PageContainer } from '@ant-design/pro-components'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useTranslation } from 'react-i18next'
+import dayjs from 'dayjs'
 import api from '../lib/api'
 import { localizeSurveySuccessMessage, localizeSurveyTitle } from '../lib/surveyDefaults'
 import { buildPreviewDocument, defaultHTML, type SurveyField, type SurveyTemplateLabels } from '../lib/surveyTemplate'
@@ -28,12 +29,14 @@ function buildSurveyPayload(
   labels: SurveyTemplateLabels,
   displayLocale: AppLocale,
   successMessage: string,
+  expiresAt: dayjs.Dayjs | null,
 ) {
   return {
     title,
     description,
     display_locale: displayLocale,
     success_message: successMessage,
+    expires_at: expiresAt ? expiresAt.endOf('day').toISOString() : null,
     schema: { version: 1, fields },
     html_template: html || defaultHTML(fields, labels),
   }
@@ -48,8 +51,9 @@ async function persistSurvey(
   labels: SurveyTemplateLabels,
   displayLocale: AppLocale,
   successMessage: string,
+  expiresAt: dayjs.Dayjs | null,
 ) {
-  const payload = buildSurveyPayload(fields, title, description, html, labels, displayLocale, successMessage)
+  const payload = buildSurveyPayload(fields, title, description, html, labels, displayLocale, successMessage, expiresAt)
   if (id === 'new') {
     const { data } = await api.post('/surveys', { locale: displayLocale })
     await api.put(`/surveys/${data.id}`, payload)
@@ -70,6 +74,7 @@ export default function SurveyEditPage() {
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
+  const [expiresAt, setExpiresAt] = useState<dayjs.Dayjs | null>(null)
   const [html, setHtml] = useState('')
   const [previewOpen, setPreviewOpen] = useState(false)
   const [llmPrompt, setLlmPrompt] = useState('')
@@ -118,6 +123,7 @@ export default function SurveyEditPage() {
     setTitle(localizeSurveyTitle(survey.title, surveyLocale, t))
     setDescription(survey.description)
     setSuccessMessage(localizeSurveySuccessMessage(survey.success_message || '', surveyLocale, t))
+    setExpiresAt(survey.expires_at ? dayjs(survey.expires_at) : null)
     const schema = survey.schema || { fields: [] }
     setFields(schema.fields || [])
     setHtml(survey.html_template || '')
@@ -142,6 +148,7 @@ export default function SurveyEditPage() {
       templateLabels,
       surveyLocale,
       successMessage.trim() || defaultSuccessMessage,
+      expiresAt,
     ),
     onSuccess: (surveyId) => {
       message.success(t('surveyEdit.saved'))
@@ -191,6 +198,7 @@ export default function SurveyEditPage() {
         templateLabels,
         surveyLocale,
         successMessage.trim() || defaultSuccessMessage,
+        expiresAt,
       )
       await api.post(`/surveys/${surveyId}/publish`)
       return surveyId
@@ -314,6 +322,16 @@ export default function SurveyEditPage() {
                   value={successMessage}
                   onChange={(e) => setSuccessMessage(e.target.value)}
                   placeholder={defaultSuccessMessage}
+                />
+              </Form.Item>
+              <Form.Item label={t('surveyEdit.expiresAt')} extra={t('surveyEdit.expiresAtHint')}>
+                <DatePicker
+                  style={{ width: '100%' }}
+                  value={expiresAt}
+                  onChange={setExpiresAt}
+                  placeholder={t('surveyEdit.expiresAtPlaceholder')}
+                  allowClear
+                  disabledDate={(d) => !!d && d < dayjs().startOf('day')}
                 />
               </Form.Item>
             </Form>

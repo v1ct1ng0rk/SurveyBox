@@ -23,8 +23,8 @@ import (
 )
 
 type Service struct {
-	pool     *pgxpool.Pool
-	storage  *storage.LocalProvider
+	pool      *pgxpool.Pool
+	storage   *storage.LocalProvider
 	webOrigin string
 }
 
@@ -52,6 +52,11 @@ type shareCtx struct {
 	Token    string
 }
 
+type surveyAccess struct {
+	Status    string
+	ExpiresAt *time.Time
+}
+
 func (s *Service) resolveShare(c *gin.Context) (*shareCtx, error) {
 	token := c.GetHeader("X-Share-Token")
 	if token == "" {
@@ -67,6 +72,32 @@ func (s *Service) resolveShare(c *gin.Context) (*shareCtx, error) {
 	return &shareCtx{ShareID: shareID, SurveyID: surveyID, Token: token}, nil
 }
 
+func (s *Service) loadSurveyAccess(c *gin.Context, surveyID string) (*surveyAccess, error) {
+	var acc surveyAccess
+	err := s.pool.QueryRow(c, `SELECT status::text, expires_at FROM surveys WHERE id=$1`, surveyID).
+		Scan(&acc.Status, &acc.ExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+	return &acc, nil
+}
+
+func (s *Service) rejectIfNotFillable(c *gin.Context, acc *surveyAccess) bool {
+	if acc.Status == "paused" {
+		c.JSON(http.StatusForbidden, gin.H{"error": "问卷已结束"})
+		return true
+	}
+	if acc.Status != "published" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效或已过期"})
+		return true
+	}
+	if acc.ExpiresAt != nil && !acc.ExpiresAt.After(time.Now()) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "问卷已截止"})
+		return true
+	}
+	return false
+}
+
 func (s *Service) getSurvey(c *gin.Context) {
 	sc, err := s.resolveShare(c)
 	if err != nil {
@@ -74,18 +105,12 @@ func (s *Service) getSurvey(c *gin.Context) {
 		return
 	}
 
-	var surveyStatus string
-	err = s.pool.QueryRow(c, `SELECT status::text FROM surveys WHERE id=$1`, sc.SurveyID).Scan(&surveyStatus)
+	acc, err := s.loadSurveyAccess(c, sc.SurveyID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效或已过期"})
 		return
 	}
-	if surveyStatus == "paused" {
-		c.JSON(http.StatusForbidden, gin.H{"error": "问卷已结束"})
-		return
-	}
-	if surveyStatus != "published" {
-		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效或已过期"})
+	if s.rejectIfNotFillable(c, acc) {
 		return
 	}
 
@@ -121,8 +146,8 @@ func (s *Service) getSurvey(c *gin.Context) {
 		"display_locale": displayLocale,
 		"schema": schemaRaw, "html_template": html,
 		"allow_multiple_submit": allowMultiple,
-		"submitted": shareStatus == "submitted",
-		"submitted_at": submittedAt,
+		"submitted":             shareStatus == "submitted",
+		"submitted_at":          submittedAt,
 	})
 }
 
@@ -141,15 +166,23 @@ func (s *Service) submitResponse(c *gin.Context) {
 		return
 	}
 
-	var status string
+	acc, err := s.loadSurveyAccess(c, sc.SurveyID)
+	if err != nil {
+		c.JSON(http.StatusForbidden, gin.H{"error": "问卷不可提交"})
+		return
+	}
+	if s.rejectIfNotFillable(c, acc) {
+		return
+	}
+
 	var allowMultiple bool
 	var schemaRaw json.RawMessage
 	err = s.pool.QueryRow(c, `
-		SELECT s.status::text, s.allow_multiple_submit, sv.schema
+		SELECT s.allow_multiple_submit, sv.schema
 		FROM surveys s JOIN survey_versions sv ON sv.id = s.current_version_id
 		WHERE s.id = $1
-	`, sc.SurveyID).Scan(&status, &allowMultiple, &schemaRaw)
-	if err != nil || status != "published" {
+	`, sc.SurveyID).Scan(&allowMultiple, &schemaRaw)
+	if err != nil {
 		c.JSON(http.StatusForbidden, gin.H{"error": "问卷不可提交"})
 		return
 	}
@@ -218,12 +251,6 @@ func (s *Service) submitResponse(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"ok": true, "response_id": responseID})
 }
 
-func (s *Service) surveyPublished(c *gin.Context, surveyID string) bool {
-	var status string
-	err := s.pool.QueryRow(c, `SELECT status::text FROM surveys WHERE id=$1`, surveyID).Scan(&status)
-	return err == nil && status == "published"
-}
-
 func (s *Service) validFileIDs(c *gin.Context, shareID string) map[string]bool {
 	rows, _ := s.pool.Query(c, `SELECT id::text FROM files WHERE share_id=$1 AND status IN ('uploaded','bound')`, shareID)
 	defer rows.Close()
@@ -242,10 +269,15 @@ func (s *Service) uploadFile(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效"})
 		return
 	}
-	if !s.surveyPublished(c, sc.SurveyID) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "问卷已结束"})
+	acc, err := s.loadSurveyAccess(c, sc.SurveyID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效"})
 		return
 	}
+	if s.rejectIfNotFillable(c, acc) {
+		return
+	}
+
 	fieldID := c.PostForm("field_id")
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
@@ -297,6 +329,15 @@ func (s *Service) downloadFile(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效"})
 		return
 	}
+	acc, err := s.loadSurveyAccess(c, sc.SurveyID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效"})
+		return
+	}
+	if s.rejectIfNotFillable(c, acc) {
+		return
+	}
+
 	fileID := c.Param("id")
 	var storageKey, filename string
 	err = s.pool.QueryRow(c, `
@@ -324,6 +365,15 @@ func (s *Service) deleteFile(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效"})
 		return
 	}
+	acc, err := s.loadSurveyAccess(c, sc.SurveyID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "链接无效"})
+		return
+	}
+	if s.rejectIfNotFillable(c, acc) {
+		return
+	}
+
 	var storageKey string
 	err = s.pool.QueryRow(c, `
 		SELECT storage_key FROM files

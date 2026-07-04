@@ -98,8 +98,7 @@ func (s *Service) batchCreate(c *gin.Context) {
 	}
 
 	var req struct {
-		ContactIDs []string   `json:"contact_ids" binding:"required,min=1"`
-		ExpiresAt  *time.Time `json:"expires_at"`
+		ContactIDs []string `json:"contact_ids" binding:"required,min=1"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "请选择联系人"})
@@ -115,11 +114,11 @@ func (s *Service) batchCreate(c *gin.Context) {
 		}
 		var it ShareItem
 		err = s.pool.QueryRow(c, `
-			INSERT INTO shares (survey_id, contact_id, token, expires_at)
-			VALUES ($1, $2, $3, $4)
-			ON CONFLICT (survey_id, contact_id) DO UPDATE SET token = EXCLUDED.token, expires_at = EXCLUDED.expires_at, status = 'pending'
+			INSERT INTO shares (survey_id, contact_id, token)
+			VALUES ($1, $2, $3)
+			ON CONFLICT (survey_id, contact_id) DO UPDATE SET token = EXCLUDED.token, status = 'pending'
 			RETURNING id::text, contact_id::text, token, status::text, expires_at, submitted_at, created_at
-		`, surveyID, cid, token, req.ExpiresAt).Scan(
+		`, surveyID, cid, token).Scan(
 			&it.ID, &it.ContactID, &it.Token, &it.Status, &it.ExpiresAt, &it.SubmittedAt, &it.CreatedAt,
 		)
 		if err != nil {
@@ -152,7 +151,6 @@ func ResolveByToken(ctx *gin.Context, pool *pgxpool.Pool, token string) (shareID
 		SELECT sh.id::text, sh.survey_id::text
 		FROM shares sh
 		WHERE sh.token = $1
-		  AND (sh.expires_at IS NULL OR sh.expires_at > NOW())
 		  AND sh.status != 'expired'
 	`, token).Scan(&shareID, &surveyID)
 	return

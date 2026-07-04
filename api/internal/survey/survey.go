@@ -33,6 +33,7 @@ type Survey struct {
 	AllowMultipleSubmit bool           `json:"allow_multiple_submit"`
 	DisplayLocale      string          `json:"display_locale"`
 	SuccessMessage     string          `json:"success_message"`
+	ExpiresAt          *time.Time      `json:"expires_at,omitempty"`
 	CurrentVersionID   *string         `json:"current_version_id,omitempty"`
 	Schema             json.RawMessage `json:"schema,omitempty"`
 	HTMLTemplate       string          `json:"html_template,omitempty"`
@@ -194,7 +195,8 @@ func (s *Service) update(c *gin.Context) {
 		HTMLTemplate *string         `json:"html_template"`
 		SuccessMessage *string      `json:"success_message"`
 		DisplayLocale  *string      `json:"display_locale"`
-		AllowMultipleSubmit *bool   `json:"allow_multiple_submit"`
+		AllowMultipleSubmit *bool          `json:"allow_multiple_submit"`
+		ExpiresAt           json.RawMessage `json:"expires_at"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
@@ -230,6 +232,27 @@ func (s *Service) update(c *gin.Context) {
 	}
 	if req.AllowMultipleSubmit != nil {
 		_, _ = s.pool.Exec(c, `UPDATE surveys SET allow_multiple_submit=$1, updated_at=NOW() WHERE id=$2`, *req.AllowMultipleSubmit, id)
+	}
+	if req.ExpiresAt != nil {
+		expiresAt, clear, err := parseExpiresAt(req.ExpiresAt)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "截止日期无效"})
+			return
+		}
+		if clear {
+			_, _ = s.pool.Exec(c, `UPDATE surveys SET expires_at=NULL, updated_at=NOW() WHERE id=$1`, id)
+		} else if expiresAt != nil {
+			if !expiresAt.After(time.Now()) {
+				var current *time.Time
+				_ = s.pool.QueryRow(c, `SELECT expires_at FROM surveys WHERE id=$1`, id).Scan(&current)
+				same := current != nil && expiresAt.Equal(*current)
+				if !same {
+					c.JSON(http.StatusBadRequest, gin.H{"error": "截止日期无效或已过期"})
+					return
+				}
+			}
+			_, _ = s.pool.Exec(c, `UPDATE surveys SET expires_at=$1, updated_at=NOW() WHERE id=$2`, expiresAt, id)
+		}
 	}
 	if req.Schema != nil || req.HTMLTemplate != nil {
 		var versionID string
@@ -453,11 +476,11 @@ func (s *Service) loadSurvey(c *gin.Context, id, userID string) (*Survey, error)
 	var versionID *string
 	err := s.pool.QueryRow(c, `
 		SELECT s.id::text, s.title, s.description, s.status::text, s.allow_multiple_submit,
-		       s.display_locale, s.success_message, s.current_version_id::text, s.created_at, s.updated_at
+		       s.display_locale, s.success_message, s.expires_at, s.current_version_id::text, s.created_at, s.updated_at
 		FROM surveys s
 		WHERE s.id = $1 AND s.created_by = $2
 	`, id, userID).Scan(&sv.ID, &sv.Title, &sv.Description, &sv.Status, &sv.AllowMultipleSubmit,
-		&sv.DisplayLocale, &sv.SuccessMessage, &versionID, &sv.CreatedAt, &sv.UpdatedAt)
+		&sv.DisplayLocale, &sv.SuccessMessage, &sv.ExpiresAt, &versionID, &sv.CreatedAt, &sv.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -467,6 +490,24 @@ func (s *Service) loadSurvey(c *gin.Context, id, userID string) (*Survey, error)
 			Scan(&sv.Schema, &sv.HTMLTemplate)
 	}
 	return &sv, nil
+}
+
+func parseExpiresAt(raw json.RawMessage) (*time.Time, bool, error) {
+	if raw == nil {
+		return nil, false, nil
+	}
+	trimmed := strings.TrimSpace(string(raw))
+	if trimmed == "" {
+		return nil, false, nil
+	}
+	if trimmed == "null" {
+		return nil, true, nil
+	}
+	var t time.Time
+	if err := json.Unmarshal(raw, &t); err != nil {
+		return nil, false, err
+	}
+	return &t, false, nil
 }
 
 func validateHTMLFieldIDs(schema json.RawMessage, html string) error {

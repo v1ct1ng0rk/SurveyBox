@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import {
-  Alert, Button, Space, Table, Tabs, Tag, Typography, message, Modal, DatePicker, Checkbox,
+  Alert, Button, Descriptions, Space, Table, Tabs, Tag, Typography, message, Modal, Checkbox,
 } from 'antd'
 import { CopyOutlined, DownloadOutlined } from '@ant-design/icons'
 import { PageContainer } from '@ant-design/pro-components'
@@ -52,7 +52,6 @@ export default function SurveyDetailPage() {
   const [shareOpen, setShareOpen] = useState(false)
   const [guideDismissed, setGuideDismissed] = useState(false)
   const [selectedContacts, setSelectedContacts] = useState<string[]>([])
-  const [expiresAt, setExpiresAt] = useState<dayjs.Dayjs | null>(null)
   const [shareResult, setShareResult] = useState<Array<{ contact_name: string; fill_url: string }>>([])
   const [detailResponse, setDetailResponse] = useState<ResponseItem | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
@@ -117,7 +116,6 @@ export default function SurveyDetailPage() {
     mutationFn: async () =>
       api.post(`/surveys/${id}/shares`, {
         contact_ids: selectedContacts,
-        expires_at: expiresAt?.toISOString() || null,
       }),
     onSuccess: (res) => {
       message.success(t('surveyDetail.shareSuccess'))
@@ -166,9 +164,7 @@ export default function SurveyDetailPage() {
         tags: statusTag ? [<Tag key="s" color={statusTag.color}>{statusTag.text}</Tag>] : [],
         extra: (
           <Space>
-            {survey?.status === 'draft' && (
-              <Button onClick={() => navigate(`/surveys/${id}/edit`)}>{t('common.edit')}</Button>
-            )}
+            <Button onClick={() => navigate(`/surveys/${id}/edit`)}>{t('common.edit')}</Button>
             {survey?.status === 'published' && (
               <Button type="primary" onClick={() => { setShareResult([]); setShareOpen(true) }}>
                 {t('surveyDetail.batchShare')}
@@ -194,6 +190,14 @@ export default function SurveyDetailPage() {
           )}
         />
       )}
+
+      <Descriptions size="small" column={1} style={{ marginBottom: 16 }} bordered>
+        <Descriptions.Item label={t('surveyDetail.expiresAt')}>
+          {survey?.expires_at
+            ? dayjs(survey.expires_at).format('YYYY-MM-DD')
+            : t('surveyDetail.noExpiry')}
+        </Descriptions.Item>
+      </Descriptions>
 
       <Tabs
         items={[
@@ -302,12 +306,6 @@ export default function SurveyDetailPage() {
           <>
             <Text type="secondary">{t('surveyDetail.selectContacts')}</Text>
             <div style={{ margin: '16px 0' }}>
-              <DatePicker
-                placeholder={t('surveyDetail.expiryPlaceholder')}
-                style={{ width: '100%', marginBottom: 16 }}
-                value={expiresAt}
-                onChange={setExpiresAt}
-              />
               <Checkbox.Group
                 style={{ display: 'flex', flexDirection: 'column', gap: 8 }}
                 value={selectedContacts}

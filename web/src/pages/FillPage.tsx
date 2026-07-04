@@ -170,12 +170,21 @@ export default function FillPage() {
     const errMsg = getErrorMessage(error)
     const translated = apiError(errMsg)
     const ended = errMsg === '问卷已结束' || translated === t('fill.surveyEnded')
+    const expired = errMsg === '问卷已截止' || translated === t('fill.surveyExpired')
     return (
       <div className="public-card fill-page__result">
         <Result
-          status={ended ? 'info' : '404'}
-          title={ended ? t('fill.surveyEnded') : t('fill.linkInvalid')}
-          subTitle={ended ? t('fill.surveyEndedDesc') : t('fill.linkInvalidDesc')}
+          status={ended || expired ? 'info' : '404'}
+          title={
+            ended ? t('fill.surveyEnded')
+              : expired ? t('fill.surveyExpired')
+                : t('fill.linkInvalid')
+          }
+          subTitle={
+            ended ? t('fill.surveyEndedDesc')
+              : expired ? t('fill.surveyExpiredDesc')
+                : t('fill.linkInvalidDesc')
+          }
         />
       </div>
     )
