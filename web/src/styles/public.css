@@ -6,6 +6,30 @@
   background: #f7f9fc;
 }
 
+.public-layout--embedded {
+  min-height: auto;
+}
+
+.survey-fill-preview {
+  margin-top: 16px;
+  border-radius: 8px;
+  overflow: hidden;
+  max-height: 70vh;
+  overflow-y: auto;
+  border: 1px solid #e8ebf0;
+}
+
+.survey-fill-preview .public-layout__content {
+  padding: 24px 16px 20px;
+}
+
+.survey-fill-preview .fill-page__submit {
+  position: static;
+  margin: 16px 0 0;
+  padding: 0;
+  background: transparent;
+}
+
 .public-layout .ant-layout-header.public-layout__header {
   height: 56px;
   line-height: 56px;

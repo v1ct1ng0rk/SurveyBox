@@ -1,11 +1,11 @@
-import { Layout, Typography } from 'antd'
+import { Layout } from 'antd'
 import { Outlet } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import api from '../lib/api'
+import PublicLayoutBrand from '../components/PublicLayoutBrand'
 import '../styles/public.css'
 
 const { Header, Content, Footer } = Layout
-const { Text } = Typography
 
 export default function PublicLayout() {
   const { data: config } = useQuery({
@@ -18,11 +18,7 @@ export default function PublicLayout() {
   return (
     <Layout className="public-layout">
       <Header className="public-layout__header">
-        {config?.org_logo_url ? (
-          <img src={config.org_logo_url} alt={orgName} className="public-layout__logo" />
-        ) : (
-          <Text className="public-layout__brand">{orgName}</Text>
-        )}
+        <PublicLayoutBrand orgName={orgName} orgLogoUrl={config?.org_logo_url} />
       </Header>
       <Content className="public-layout__content">
         <Outlet />

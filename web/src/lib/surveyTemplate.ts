@@ -163,6 +163,3 @@ export function defaultHTML(fields: SurveyField[], labels: SurveyTemplateLabels 
   return `<form class="survey-form">${body}</form>`
 }
 
-export function buildPreviewDocument(html: string, fields: SurveyField[], labels?: SurveyTemplateLabels) {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${SURVEY_FORM_CSS}</style></head><body class="survey-skin">${html || defaultHTML(fields, labels)}</body></html>`
-}

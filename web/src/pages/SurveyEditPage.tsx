@@ -10,10 +10,11 @@ import { useTranslation } from 'react-i18next'
 import dayjs from 'dayjs'
 import api from '../lib/api'
 import { localizeSurveySuccessMessage, localizeSurveyTitle } from '../lib/surveyDefaults'
-import { buildPreviewDocument, defaultHTML, type SurveyField, type SurveyTemplateLabels } from '../lib/surveyTemplate'
+import { defaultHTML, type SurveyField, type SurveyTemplateLabels } from '../lib/surveyTemplate'
 import { useApiError, useSurveyStatus } from '../i18n/hooks'
 import { normalizeSurveyLocale, type AppLocale } from '../i18n'
 import PublishSuccessModal from '../components/PublishSuccessModal'
+import SurveyFillPreview from '../components/SurveyFillPreview'
 
 const { TextArea } = Input
 const { Text } = Typography
@@ -219,11 +220,6 @@ export default function SurveyEditPage() {
     },
   })
 
-  const previewSrcDoc = useMemo(
-    () => buildPreviewDocument(html, fields, templateLabels),
-    [html, fields, templateLabels],
-  )
-
   const addField = () => {
     const fid = `field_${Date.now()}`
     const next = [...fields, { id: fid, type: 'text', label: t('surveyEdit.newQuestion'), required: false }]
@@ -414,15 +410,15 @@ export default function SurveyEditPage() {
         open={previewOpen}
         onCancel={() => setPreviewOpen(false)}
         footer={null}
-        width={760}
+        width={720}
         destroyOnClose
+        styles={{ body: { paddingTop: 12 } }}
       >
         <Text type="secondary">{t('surveyEdit.previewHint')}</Text>
-        <iframe
-          title="preview-modal"
-          sandbox="allow-forms"
-          style={{ width: '100%', height: '70vh', border: 'none', marginTop: 16, borderRadius: 8, background: '#f8fafc' }}
-          srcDoc={previewSrcDoc}
+        <SurveyFillPreview
+          title={title || t('surveyEdit.untitled')}
+          description={description}
+          fields={fields}
         />
       </Modal>
 
