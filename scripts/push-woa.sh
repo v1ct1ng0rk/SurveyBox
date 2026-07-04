@@ -35,7 +35,12 @@ git branch -f "$tmp_branch" "${WOA_REMOTE}/${WOA_BRANCH}"
 git checkout "$tmp_branch"
 
 for commit in $commits; do
-  git cherry-pick --no-commit "$commit"
+  git cherry-pick --no-commit "$commit" || true
+  if git diff --cached --quiet && git diff --quiet; then
+    echo "Skipping ${commit:0:7} (already on ${WOA_REMOTE}/${WOA_BRANCH})."
+    git reset --hard HEAD
+    continue
+  fi
   git -c user.name="$WOA_NAME" -c user.email="$WOA_EMAIL" \
     commit -C "$commit" --reset-author
 done
